@@ -1,0 +1,73 @@
+@baseUrl = http://localhost:4000/api
+# Seeded by `npm run db:seed`
+@email = ada@taskflow.dev
+@password = password123
+
+### Health
+GET http://localhost:4000/health
+
+### Register a new account
+# @name register
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "newcomer@taskflow.dev",
+  "name": "New Comer",
+  "password": "supersecret123"
+}
+
+### Login
+# @name login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "{{password}}"
+}
+
+@accessToken = {{login.response.body.tokens.accessToken}}
+@refreshToken = {{login.response.body.tokens.refreshToken}}
+
+### Current user
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{accessToken}}
+
+### Refresh (rotates: the presented refresh token is revoked)
+# @name refresh
+POST {{baseUrl}}/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "{{refreshToken}}"
+}
+
+### Replay the rotated token - expected 401
+POST {{baseUrl}}/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "{{refreshToken}}"
+}
+
+### Logout - expected 204
+POST {{baseUrl}}/auth/logout
+Content-Type: application/json
+
+{
+  "refreshToken": "{{refresh.response.body.tokens.refreshToken}}"
+}
+
+### Missing token - expected 401
+GET {{baseUrl}}/auth/me
+
+### Validation failure - expected 422
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "not-an-email",
+  "name": "",
+  "password": "123"
+}

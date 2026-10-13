@@ -1,0 +1,158 @@
+@baseUrl = http://localhost:4000/api
+
+### Login
+# @name login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "ada@taskflow.dev",
+  "password": "password123"
+}
+
+@token = {{login.response.body.tokens.accessToken}}
+
+### Context
+# @name workspaces
+GET {{baseUrl}}/workspaces
+Authorization: Bearer {{token}}
+
+@workspaceId = {{workspaces.response.body.data.0.id}}
+
+# @name projects
+GET {{baseUrl}}/workspaces/{{workspaceId}}/projects
+Authorization: Bearer {{token}}
+
+@projectId = {{projects.response.body.data.0.id}}
+
+# @name labels
+GET {{baseUrl}}/workspaces/{{workspaceId}}/labels
+Authorization: Bearer {{token}}
+
+@labelId = {{labels.response.body.0.id}}
+
+### Tasks in a project
+# @name tasks
+GET {{baseUrl}}/projects/{{projectId}}/tasks?sort=-priority
+Authorization: Bearer {{token}}
+
+@taskId = {{tasks.response.body.data.0.id}}
+
+### Cross-project board view with filters
+GET {{baseUrl}}/workspaces/{{workspaceId}}/tasks?status=TODO&status=IN_PROGRESS&priority=HIGH&sort=dueDate&topLevelOnly=true
+Authorization: Bearer {{token}}
+
+### Tasks assigned to me
+GET {{baseUrl}}/workspaces/{{workspaceId}}/tasks?assigneeId=me
+Authorization: Bearer {{token}}
+
+### Unassigned tasks due in the near future
+GET {{baseUrl}}/workspaces/{{workspaceId}}/tasks?assigneeId=unassigned&dueBefore=2027-01-01T00:00:00Z
+Authorization: Bearer {{token}}
+
+### Full-text-ish search over title and description
+GET {{baseUrl}}/workspaces/{{workspaceId}}/tasks?search=engine
+Authorization: Bearer {{token}}
+
+### Create a task
+POST {{baseUrl}}/projects/{{projectId}}/tasks
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "title": "Qualify the turbopump bearings",
+  "description": "Needs 200 hours on the test stand",
+  "priority": "HIGH",
+  "dueDate": "2027-01-15T00:00:00Z",
+  "labelIds": ["{{labelId}}"]
+}
+
+### Create a subtask (one level of nesting only)
+POST {{baseUrl}}/projects/{{projectId}}/tasks
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "title": "Order spare bearings",
+  "parentTaskId": "{{taskId}}"
+}
+
+### Get a task
+GET {{baseUrl}}/tasks/{{taskId}}
+Authorization: Bearer {{token}}
+
+### Subtasks
+GET {{baseUrl}}/tasks/{{taskId}}/subtasks
+Authorization: Bearer {{token}}
+
+### Update fields
+PATCH {{baseUrl}}/tasks/{{taskId}}
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "priority": "URGENT",
+  "description": "Escalated after the design review"
+}
+
+### Change status (DONE is refused while subtasks are open)
+PATCH {{baseUrl}}/tasks/{{taskId}}/status
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "status": "IN_PROGRESS"
+}
+
+### Assign (the assignee must be a workspace member)
+PATCH {{baseUrl}}/tasks/{{taskId}}/assignee
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "assigneeId": null
+}
+
+### Attach a label
+POST {{baseUrl}}/tasks/{{taskId}}/labels
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "labelId": "{{labelId}}"
+}
+
+### Detach a label
+DELETE {{baseUrl}}/tasks/{{taskId}}/labels/{{labelId}}
+Authorization: Bearer {{token}}
+
+### Delete a task (cascades to subtasks and comments)
+DELETE {{baseUrl}}/tasks/{{taskId}}
+Authorization: Bearer {{token}}
+
+### Workspace labels
+GET {{baseUrl}}/workspaces/{{workspaceId}}/labels
+Authorization: Bearer {{token}}
+
+### Create a label
+POST {{baseUrl}}/workspaces/{{workspaceId}}/labels
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "hardware",
+  "color": "#059669"
+}
+
+### Rename a label
+PATCH {{baseUrl}}/labels/{{labelId}}
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "color": "#f59e0b"
+}
+
+### Delete a label (ADMIN or above)
+DELETE {{baseUrl}}/labels/{{labelId}}
+Authorization: Bearer {{token}}

@@ -1,0 +1,67 @@
+@baseUrl = http://localhost:4000/api
+
+### Login
+# @name login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "ada@taskflow.dev",
+  "password": "password123"
+}
+
+@token = {{login.response.body.tokens.accessToken}}
+
+### Pick a workspace
+# @name workspaces
+GET {{baseUrl}}/workspaces
+Authorization: Bearer {{token}}
+
+@workspaceId = {{workspaces.response.body.data.0.id}}
+
+### List projects (archived hidden by default)
+# @name projects
+GET {{baseUrl}}/workspaces/{{workspaceId}}/projects
+Authorization: Bearer {{token}}
+
+@projectId = {{projects.response.body.data.0.id}}
+
+### Filter and search
+GET {{baseUrl}}/workspaces/{{workspaceId}}/projects?status=ACTIVE&search=apollo&includeArchived=true
+Authorization: Bearer {{token}}
+
+### Create a project (key derived from the name when omitted)
+POST {{baseUrl}}/workspaces/{{workspaceId}}/projects
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "Range Safety",
+  "description": "Everything the range safety officer signs off on"
+}
+
+### Get a project with task counts by status
+GET {{baseUrl}}/projects/{{projectId}}
+Authorization: Bearer {{token}}
+
+### Update
+PATCH {{baseUrl}}/projects/{{projectId}}
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "status": "PAUSED",
+  "description": "On hold pending the design review"
+}
+
+### Archive (ADMIN or above)
+POST {{baseUrl}}/projects/{{projectId}}/archive
+Authorization: Bearer {{token}}
+
+### Unarchive
+POST {{baseUrl}}/projects/{{projectId}}/unarchive
+Authorization: Bearer {{token}}
+
+### Delete (ADMIN or above, cascades to tasks)
+DELETE {{baseUrl}}/projects/{{projectId}}
+Authorization: Bearer {{token}}

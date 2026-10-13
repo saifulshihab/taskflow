@@ -1,0 +1,76 @@
+@baseUrl = http://localhost:4000/api
+
+### Login as the seeded owner
+# @name login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "ada@taskflow.dev",
+  "password": "password123"
+}
+
+@token = {{login.response.body.tokens.accessToken}}
+
+### List my workspaces
+# @name workspaces
+GET {{baseUrl}}/workspaces?page=1&pageSize=20
+Authorization: Bearer {{token}}
+
+@workspaceId = {{workspaces.response.body.data.0.id}}
+
+### Create a workspace (slug is derived when omitted)
+POST {{baseUrl}}/workspaces
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "Side Projects"
+}
+
+### Get one workspace
+GET {{baseUrl}}/workspaces/{{workspaceId}}
+Authorization: Bearer {{token}}
+
+### Rename it (ADMIN or above)
+PATCH {{baseUrl}}/workspaces/{{workspaceId}}
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "Acme Rockets HQ"
+}
+
+### Members
+# @name members
+GET {{baseUrl}}/workspaces/{{workspaceId}}/members
+Authorization: Bearer {{token}}
+
+@memberId = {{members.response.body.data.2.user.id}}
+
+### Add a member by email (ADMIN or above)
+POST {{baseUrl}}/workspaces/{{workspaceId}}/members
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "email": "grace@taskflow.dev",
+  "role": "ADMIN"
+}
+
+### Change a member's role (OWNER role requires an owner)
+PATCH {{baseUrl}}/workspaces/{{workspaceId}}/members/{{memberId}}
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "role": "ADMIN"
+}
+
+### Remove a member (members may remove themselves)
+DELETE {{baseUrl}}/workspaces/{{workspaceId}}/members/{{memberId}}
+Authorization: Bearer {{token}}
+
+### Delete the workspace (OWNER only, cascades to everything inside)
+DELETE {{baseUrl}}/workspaces/{{workspaceId}}
+Authorization: Bearer {{token}}

@@ -1,0 +1,71 @@
+@baseUrl = http://localhost:4000/api
+
+### Login
+# @name login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "ada@taskflow.dev",
+  "password": "password123"
+}
+
+@token = {{login.response.body.tokens.accessToken}}
+
+### Context
+# @name workspaces
+GET {{baseUrl}}/workspaces
+Authorization: Bearer {{token}}
+
+@workspaceId = {{workspaces.response.body.data.0.id}}
+
+# @name tasks
+GET {{baseUrl}}/workspaces/{{workspaceId}}/tasks
+Authorization: Bearer {{token}}
+
+@taskId = {{tasks.response.body.data.0.id}}
+
+### Comments on a task
+# @name comments
+GET {{baseUrl}}/tasks/{{taskId}}/comments
+Authorization: Bearer {{token}}
+
+@commentId = {{comments.response.body.data.0.id}}
+
+### Add a comment
+POST {{baseUrl}}/tasks/{{taskId}}/comments
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "body": "Vendor quote came back 20% over budget."
+}
+
+### Edit a comment (author only; sets editedAt)
+PATCH {{baseUrl}}/comments/{{commentId}}
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "body": "Vendor quote came back 20% over budget - renegotiating."
+}
+
+### Delete a comment (author, or ADMIN moderating)
+DELETE {{baseUrl}}/comments/{{commentId}}
+Authorization: Bearer {{token}}
+
+### Activity feed for the workspace
+GET {{baseUrl}}/workspaces/{{workspaceId}}/activity?pageSize=25
+Authorization: Bearer {{token}}
+
+### Only task events
+GET {{baseUrl}}/workspaces/{{workspaceId}}/activity?entityType=task
+Authorization: Bearer {{token}}
+
+### History of one entity
+GET {{baseUrl}}/workspaces/{{workspaceId}}/activity?entityId={{taskId}}
+Authorization: Bearer {{token}}
+
+### One kind of action, recent only
+GET {{baseUrl}}/workspaces/{{workspaceId}}/activity?action=task.status_changed&since=2026-01-01T00:00:00Z
+Authorization: Bearer {{token}}

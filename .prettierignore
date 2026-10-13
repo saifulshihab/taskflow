@@ -1,0 +1,6 @@
+dist
+node_modules
+.agents
+src/generated
+prisma/migrations
+package-lock.json
