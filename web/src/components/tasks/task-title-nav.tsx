@@ -1,7 +1,7 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useState } from "react";
 import { cn } from "cn";
 
 /**
@@ -19,35 +19,30 @@ export function TaskTitleNav({
   title: string;
   className?: string;
 }) {
-  const router = useRouter();
   const [hovered, setHovered] = useState(false);
-  const navigateOnClick = useRef(false);
+  const href = `/w/${workspaceId}/tasks/${taskId}`;
 
   return (
-    <span
-      role="presentation"
+    <Link
+      href={href}
       className={cn(
         // Fit the text only — block would stretch to the card edge and
         // treat empty space beside the title as hoverable.
         "inline-block w-fit max-w-full text-sm font-medium leading-snug",
-        hovered && "cursor-pointer underline underline-offset-2",
+        hovered && "underline underline-offset-2",
         className,
       )}
-      onMouseEnter={() => {
-        navigateOnClick.current = true;
-        setHovered(true);
-      }}
-      onMouseLeave={() => {
-        navigateOnClick.current = false;
-        setHovered(false);
-      }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
       onClick={(event) => {
-        if (!navigateOnClick.current) return;
-        event.stopPropagation();
-        router.push(`/w/${workspaceId}/tasks/${taskId}`);
+        if (hovered) {
+          event.stopPropagation();
+          return;
+        }
+        event.preventDefault();
       }}
     >
       {title}
-    </span>
+    </Link>
   );
 }
