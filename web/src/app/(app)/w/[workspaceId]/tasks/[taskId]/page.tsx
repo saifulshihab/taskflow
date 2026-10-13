@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/page-header";
-import { PriorityBadge, StatusBadge } from "@/components/tasks/task-badges";
+import { TaskDetailPanels } from "@/components/tasks/task-detail-panels";
 import { buttonVariants } from "@/components/ui/button";
 import {
   getMe,
@@ -13,10 +13,6 @@ import {
   listSubtasks,
 } from "@/lib/data";
 import { can } from "@/lib/rbac";
-import { CommentSection } from "./comment-section";
-import { TaskEditForm } from "./task-edit-form";
-import { TaskLabels } from "./task-labels";
-import { SubtaskSection } from "./subtask-section";
 
 export default async function TaskDetailPage({
   params,
@@ -59,54 +55,18 @@ export default async function TaskDetailPage({
         </Link>
       </PageHeader>
 
-      <div className="grid gap-6 p-4 md:p-6 lg:grid-cols-[1fr_280px]">
-        <div className="space-y-6">
-          {canEdit ? (
-            <TaskEditForm
-              task={task}
-              workspaceId={workspaceId}
-              members={members.data}
-            />
-          ) : (
-            <div className="space-y-3 rounded-xl border p-4">
-              <p className="whitespace-pre-wrap text-sm">
-                {task.description ?? "No description"}
-              </p>
-              <div className="flex flex-wrap gap-3">
-                <StatusBadge status={task.status} />
-                <PriorityBadge priority={task.priority} />
-              </div>
-            </div>
-          )}
-
-          <SubtaskSection
-            workspaceId={workspaceId}
-            projectId={task.projectId}
-            parentTaskId={taskId}
-            subtasks={subtasks}
-            canEdit={canEdit}
-          />
-
-          <CommentSection
-            workspaceId={workspaceId}
-            taskId={taskId}
-            comments={comments.data}
-            canPost={canEdit}
-            canModerate={canModerateComments}
-            currentUserId={me.id}
-          />
-        </div>
-
-        <aside className="space-y-4">
-          <TaskLabels
-            workspaceId={workspaceId}
-            projectId={task.projectId}
-            taskId={taskId}
-            labels={labels}
-            attached={task.labels}
-            canEdit={canEdit}
-          />
-        </aside>
+      <div className="p-4 md:p-6">
+        <TaskDetailPanels
+          workspaceId={workspaceId}
+          task={task}
+          members={members.data}
+          labels={labels}
+          subtasks={subtasks}
+          comments={comments.data}
+          me={me}
+          canEdit={canEdit}
+          canModerateComments={canModerateComments}
+        />
       </div>
     </>
   );

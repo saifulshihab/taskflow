@@ -22,6 +22,7 @@ export function ActionDialog({
   pendingLabel,
   open,
   onOpenChange,
+  onSuccess,
 }: {
   trigger?: React.ReactNode;
   title: string;
@@ -32,12 +33,16 @@ export function ActionDialog({
   pendingLabel?: string;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  onSuccess?: () => void;
 }) {
   const [state, formAction] = useActionState(action, {});
 
   useEffect(() => {
-    if (state.ok) onOpenChange?.(false);
-  }, [state.ok, onOpenChange]);
+    if (state.ok) {
+      onOpenChange?.(false);
+      onSuccess?.();
+    }
+  }, [state.ok, onOpenChange, onSuccess]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

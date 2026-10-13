@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import { ActionDialog } from "@/components/dialog-form";
 import { Button } from "@/components/ui/button";
@@ -13,12 +15,16 @@ export function SubtaskSection({
   parentTaskId,
   subtasks,
   canEdit,
+  onCreated,
+  onSubtaskSelect,
 }: {
   workspaceId: string;
   projectId: string;
   parentTaskId: string;
   subtasks: Task[];
   canEdit: boolean;
+  onCreated?: () => void;
+  onSubtaskSelect?: (taskId: string) => void;
 }) {
   return (
     <section className="rounded-xl border p-4">
@@ -30,6 +36,7 @@ export function SubtaskSection({
             title="New subtask"
             action={createTaskAction}
             submitLabel="Create"
+            onSuccess={onCreated}
           >
             <input type="hidden" name="workspaceId" value={workspaceId} />
             <input type="hidden" name="projectId" value={projectId} />
@@ -47,12 +54,22 @@ export function SubtaskSection({
         <ul className="space-y-2">
           {subtasks.map((subtask) => (
             <li key={subtask.id} className="flex items-center justify-between gap-2 text-sm">
-              <Link
-                href={`/w/${workspaceId}/tasks/${subtask.id}`}
-                className="hover:underline"
-              >
-                {subtask.title}
-              </Link>
+              {onSubtaskSelect ? (
+                <button
+                  type="button"
+                  className="text-left hover:underline"
+                  onClick={() => onSubtaskSelect(subtask.id)}
+                >
+                  {subtask.title}
+                </button>
+              ) : (
+                <Link
+                  href={`/w/${workspaceId}/tasks/${subtask.id}`}
+                  className="hover:underline"
+                >
+                  {subtask.title}
+                </Link>
+              )}
               <StatusBadge status={subtask.status} />
             </li>
           ))}

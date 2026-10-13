@@ -94,7 +94,17 @@ export async function deleteTaskAction(formData: FormData): Promise<FormState> {
   }
 
   revalidateTaskPaths(workspaceId, projectId);
-  redirect(projectId ? `/w/${workspaceId}/projects/${projectId}` : `/w/${workspaceId}/tasks`);
+  revalidatePath(`/w/${workspaceId}/tasks/${taskId}`);
+
+  if (field(formData, "skipRedirect") === "true") {
+    return { ok: true };
+  }
+
+  redirect(
+    projectId
+      ? `/w/${workspaceId}/projects/${projectId}`
+      : `/w/${workspaceId}/tasks`,
+  );
 }
 
 export async function setTaskStatusAction(

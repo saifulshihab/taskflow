@@ -20,6 +20,7 @@ export function CommentSection({
   canPost,
   canModerate,
   currentUserId,
+  onMutate,
 }: {
   workspaceId: string;
   taskId: string;
@@ -27,11 +28,16 @@ export function CommentSection({
   canPost: boolean;
   canModerate: boolean;
   currentUserId: string;
+  onMutate?: () => void;
 }) {
   const [state, action] = useActionState<FormState, FormData>(
     createCommentAction,
     {},
   );
+
+  useEffect(() => {
+    if (state.ok) onMutate?.();
+  }, [state.ok, onMutate]);
 
   return (
     <section className="rounded-xl border p-4">
@@ -46,6 +52,7 @@ export function CommentSection({
             taskId={taskId}
             currentUserId={currentUserId}
             canModerate={canModerate}
+            onMutate={onMutate}
           />
         ))}
       </ul>
@@ -71,12 +78,14 @@ function CommentItem({
   taskId,
   currentUserId,
   canModerate,
+  onMutate,
 }: {
   comment: Comment;
   workspaceId: string;
   taskId: string;
   currentUserId: string;
   canModerate: boolean;
+  onMutate?: () => void;
 }) {
   const canDelete = comment.author.id === currentUserId || canModerate;
   const [editing, setEditing] = useState(false);
@@ -86,15 +95,20 @@ function CommentItem({
   );
 
   useEffect(() => {
-    if (state.ok) setEditing(false);
-  }, [state.ok]);
+    if (state.ok) {
+      setEditing(false);
+      onMutate?.();
+    }
+  }, [state.ok, onMutate]);
 
   const onDelete = () => {
     const formData = new FormData();
     formData.set("workspaceId", workspaceId);
     formData.set("taskId", taskId);
     formData.set("commentId", comment.id);
-    void deleteCommentAction(formData);
+    void deleteCommentAction(formData).then((result) => {
+      if (result.ok) onMutate?.();
+    });
   };
 
   return (

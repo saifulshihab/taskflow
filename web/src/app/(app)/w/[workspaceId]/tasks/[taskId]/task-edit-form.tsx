@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
 import { FieldError, FormError, SubmitButton } from "@/components/form-feedback";
 import { NativeSelect } from "@/components/native-select";
 import { Button } from "@/components/ui/button";
@@ -25,22 +25,37 @@ export function TaskEditForm({
   task,
   workspaceId,
   members,
+  onSaved,
+  deleteMode = "redirect",
+  onDeleted,
 }: {
   task: Task;
   workspaceId: string;
   members: Member[];
+  onSaved?: () => void;
+  deleteMode?: "redirect" | "close";
+  onDeleted?: () => void;
 }) {
   const [state, action] = useActionState<FormState, FormData>(
     updateTaskAction,
     {},
   );
 
+  useEffect(() => {
+    if (state.ok) onSaved?.();
+  }, [state.ok, onSaved]);
+
   const onDelete = () => {
     const formData = new FormData();
     formData.set("workspaceId", workspaceId);
     formData.set("projectId", task.projectId);
     formData.set("taskId", task.id);
-    void deleteTaskAction(formData);
+    if (deleteMode === "close") {
+      formData.set("skipRedirect", "true");
+    }
+    void deleteTaskAction(formData).then((result) => {
+      if (result.ok && deleteMode === "close") onDeleted?.();
+    });
   };
 
   return (

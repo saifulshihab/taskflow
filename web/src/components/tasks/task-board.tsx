@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useOptimistic, useState, useTransition } from "react";
-import Link from "next/link";
 import {
   DndContext,
   DragOverlay,
@@ -22,16 +21,20 @@ import {
   type TaskStatus,
 } from "@/lib/api-types";
 import { TASK_STATUS_LABELS } from "@/lib/format";
+import { TaskDetailDialog } from "@/components/tasks/task-detail-dialog";
+import { TaskTitleNav } from "@/components/tasks/task-title-nav";
 import { cn } from "cn";
 
 function BoardCard({
   task,
   workspaceId,
   dragging,
+  onOpenDetails,
 }: {
   task: Task;
   workspaceId: string;
   dragging?: boolean;
+  onOpenDetails: (task: Task) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: task.id,
@@ -61,13 +64,23 @@ function BoardCard({
         >
           ⋮⋮
         </button>
-        <div className="min-w-0 flex-1 space-y-2">
-          <Link
-            href={`/w/${workspaceId}/tasks/${task.id}`}
-            className="block text-sm font-medium leading-snug hover:underline"
-          >
-            {task.title}
-          </Link>
+        <div
+          role="button"
+          tabIndex={0}
+          className="min-w-0 flex-1 cursor-pointer space-y-2 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          onClick={() => onOpenDetails(task)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              onOpenDetails(task);
+            }
+          }}
+        >
+          <TaskTitleNav
+            workspaceId={workspaceId}
+            taskId={task.id}
+            title={task.title}
+          />
           <div className="flex flex-wrap items-center gap-2">
             <PriorityBadge priority={task.priority} />
             {task.assignee && (
@@ -86,10 +99,12 @@ function BoardColumn({
   status,
   tasks,
   workspaceId,
+  onOpenDetails,
 }: {
   status: TaskStatus;
   tasks: Task[];
   workspaceId: string;
+  onOpenDetails: (task: Task) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: status });
 
@@ -107,7 +122,12 @@ function BoardColumn({
         )}
       >
         {tasks.map((task) => (
-          <BoardCard key={task.id} task={task} workspaceId={workspaceId} />
+          <BoardCard
+            key={task.id}
+            task={task}
+            workspaceId={workspaceId}
+            onOpenDetails={onOpenDetails}
+          />
         ))}
       </div>
     </div>
@@ -124,6 +144,8 @@ export function TaskBoard({
   projectId: string;
 }) {
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [detailTaskId, setDetailTaskId] = useState<string | null>(null);
+  const [detailPreviewTitle, setDetailPreviewTitle] = useState<string>();
   const [, startTransition] = useTransition();
 
   const [optimisticTasks, setOptimisticTasks] = useOptimistic(
@@ -191,9 +213,22 @@ export function TaskBoard({
             status={status}
             tasks={byStatus[status]}
             workspaceId={workspaceId}
+            onOpenDetails={(task) => {
+              setDetailTaskId(task.id);
+              setDetailPreviewTitle(task.title);
+            }}
           />
         ))}
       </div>
+      <TaskDetailDialog
+        taskId={detailTaskId}
+        previewTitle={detailPreviewTitle}
+        workspaceId={workspaceId}
+        open={detailTaskId !== null}
+        onOpenChange={(open) => {
+          if (!open) setDetailTaskId(null);
+        }}
+      />
       <DragOverlay>
         {activeTask ? (
           <div className="bg-card w-72 rounded-lg border p-3 shadow-lg">

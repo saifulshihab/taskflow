@@ -17,6 +17,7 @@ export function TaskLabels({
   labels,
   attached,
   canEdit,
+  onMutate,
 }: {
   workspaceId: string;
   projectId: string;
@@ -24,6 +25,7 @@ export function TaskLabels({
   labels: Label[];
   attached: Label[];
   canEdit: boolean;
+  onMutate?: () => void;
 }) {
   const [pending, startTransition] = useTransition();
   const attachedIds = new Set(attached.map((label) => label.id));
@@ -38,6 +40,7 @@ export function TaskLabels({
     startTransition(async () => {
       const result = await attachLabelAction(formData);
       if (result.error) toast.error(result.error);
+      else onMutate?.();
     });
   };
 
@@ -50,6 +53,7 @@ export function TaskLabels({
     startTransition(async () => {
       const result = await detachLabelAction(formData);
       if (result.error) toast.error(result.error);
+      else onMutate?.();
     });
   };
 
