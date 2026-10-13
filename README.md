@@ -1,56 +1,89 @@
-# TaskFlow API
+# TaskFlow
 
-A project/task-management REST API built with Express 5, TypeScript and Prisma
-on Prisma Postgres. It exists as a realistic backend to later expose through an
-MCP server.
+Full-stack project and task management: workspaces, Kanban boards, labels,
+comments, and an activity feed. The **Express REST API** and **Next.js web app**
+share the same domain logic; the UI talks to the API through a BFF layer
+(httpOnly cookies, Server Actions). The backend is structured so the same
+services can later be exposed through an MCP server without duplicating
+authorization or business rules.
+
+## Stack
+
+| Layer    | Technologies |
+| -------- | ------------ |
+| API      | Express 5, TypeScript, Zod, Prisma 7, PostgreSQL (Prisma Postgres in dev) |
+| Web      | Next.js 16, React 19, Tailwind CSS 4, shadcn/ui, dnd-kit |
+| Auth     | JWT access tokens + rotating opaque refresh tokens (argon2 password hashing) |
+| Dev ops  | Docker Compose (API + web), local `prisma dev` for the database |
+
+## Features
+
+- **Workspaces** with slug, settings, and role-based access (`OWNER` → `VIEWER`)
+- **Projects** with status, archive/unarchive, and per-project **board** and **list** views
+- **Tasks** with status, priority, assignee, due dates, subtasks, and drag-and-drop on boards
+- **Labels** at workspace scope, attachable to tasks
+- **Comments** (soft-deleted for activity continuity)
+- **Activity** feed per workspace
+- **Members** management and invitations by role
 
 ## Running it
 
-Two processes: the database runs on your host, the API runs in Docker.
+**Prerequisites:** Node.js 20+, Docker, and a copy of `.env` (see `.env.example`).
+
+Two processes: the database runs on your host, the API and web run in Docker.
 
 ```bash
+cp .env.example .env   # first time; set JWT secrets
 npx prisma@prev dev --detach   # local Prisma Postgres (ports 51214/51215)
-docker compose up -d           # API on http://localhost:4000
+docker compose up -d           # API on http://localhost:4000, web on http://localhost:3100
 curl localhost:4000/health     # {"status":"ok","database":"up"}
 ```
 
-The web UI is a Next.js app in `web/`. With Compose up it is served on
-`http://localhost:${WEB_PORT:-3100}` (see `.env.example`). The container talks
-to the API at `http://api:4000/api`; when you run `npm run dev` in `web/` on
-the host, set `API_URL=http://localhost:4000/api`.
+Open the UI at `http://localhost:${WEB_PORT:-3100}` and sign in with a seeded
+account (see [Seeded accounts](#seeded-accounts)).
 
-```bash
-docker compose up -d           # api + web
-open http://localhost:3100       # sign in with a seeded account
-```
-
-Auth uses httpOnly cookies (BFF): `web/src/proxy.ts` refreshes access tokens
-before Server Components run, and Server Actions call the same REST API via
-`web/src/lib/api.ts`.
-
-First time only, or after changing dependencies:
+**First time**, or after changing dependencies:
 
 ```bash
 docker compose run --rm api npm ci
+docker compose run --rm web npm ci
 docker compose exec api npx prisma migrate dev
 docker compose exec api npm run db:seed
 ```
 
-Everything else runs inside the container, because `node_modules` lives in a
-Docker volume rather than on your host:
+### Web on the host
+
+The Compose `web` service uses `API_URL=http://api:4000/api`. If you run the UI
+locally instead:
+
+```bash
+cd web && npm ci && API_URL=http://localhost:4000/api npm run dev
+```
+
+You still need the API and database running (`docker compose up -d api` is enough
+for the API if you use host `DATABASE_URL` only inside the container).
+
+Auth uses httpOnly cookies (BFF): `web/src/proxy.ts` refreshes access tokens
+before Server Components run, and Server Actions call the REST API via
+`web/src/lib/api.ts`.
+
+### Day-to-day commands
+
+`node_modules` for API and web live in Docker volumes when using Compose:
 
 ```bash
 docker compose exec api npm run typecheck
 docker compose exec web npx tsc --noEmit
 docker compose exec api npx prisma migrate dev --name <name>
 docker compose logs -f api
+docker compose logs -f web
 ```
 
 ### Why two connection strings
 
 `prisma dev` binds to `127.0.0.1`, and Docker Desktop runs containers inside a
 VM, so a container cannot reach that address directly. `.env` therefore carries
-both `DATABASE_URL` (localhost, used when the Prisma CLI runs on your host) and
+both `DATABASE_URL` (localhost, for Prisma CLI on your host) and
 `DATABASE_URL_CONTAINER` (`host.docker.internal`), which `docker-compose.yml`
 maps onto `DATABASE_URL` inside the container.
 
@@ -60,32 +93,42 @@ maps onto `DATABASE_URL` inside the container.
 workspace with `ada@taskflow.dev` (owner), `grace@taskflow.dev` (admin) and
 `linus@taskflow.dev` (member). Password for all three: `password123`.
 
-## Trying the endpoints
+## Trying the API
 
-The `requests/` directory holds `.http` files for every endpoint, grouped by
-module, runnable from an editor REST client. Each file logs in first and reuses
-the returned token, so run the requests top to bottom.
+The `requests/` directory holds `.http` files grouped by module, runnable from an
+editor REST client. Each file logs in first and reuses the token; run requests
+top to bottom.
 
-## Layout
+Files: `auth.http`, `workspaces.http`, `projects.http`, `tasks.http`,
+`comments-activity.http`.
+
+## Repository layout
 
 ```
-src/
+src/                    # Express API
   server.ts app.ts routes.ts env.ts seed.ts
-  lib/         prisma, tokens, password, errors, http, pagination, rbac, scope, activity, actor, logger
-  middleware/  requireAuth, errorHandler
+  lib/                  prisma, tokens, password, errors, http, pagination, rbac, …
+  middleware/           requireAuth, errorHandler
   modules/<auth|workspaces|projects|tasks|labels|comments|activity>/
-               *.routes.ts  *.controller.ts  *.service.ts  *.schema.ts
+                        *.routes.ts  *.controller.ts  *.service.ts  *.schema.ts
+
+web/                    # Next.js app
+  src/app/              routes (auth, workspaces, /w/[workspaceId]/…)
+  src/components/       UI, app shell, tasks (board, table, detail)
+  src/lib/              api client, Server Actions, RBAC helpers, data loaders
+
+prisma/                 schema and migrations
+requests/               REST client examples
 ```
 
-Every module repeats the same four files. Routes map paths to controllers,
-controllers validate input and call services, and services hold the business
-logic.
+Every API module repeats the same four files: routes map paths to controllers,
+controllers validate input and call services, and services hold business logic.
 
 ### The one rule that matters
 
 Services never touch `req` or `res`. They take an explicit `actor` and plain
 arguments, and they perform their own authorization through
-`requireMembership`. That is what makes the MCP phase straightforward: a tool
+`requireMembership`. That is what makes an MCP phase straightforward: a tool
 handler builds an actor and calls the same function the HTTP layer calls, with
 identical permission checks and no HTTP round trip.
 
@@ -95,21 +138,45 @@ Express routes/controllers ─┐
 MCP tools (later)          ─┘
 ```
 
-## API
+## API reference
 
-All routes are under `/api` and require `Authorization: Bearer <accessToken>`
-except register, login and refresh.
+Base path: `/api`. Send `Authorization: Bearer <accessToken>` on all routes
+except register, login, and refresh.
 
-| Area       | Endpoints                                                                             |
-| ---------- | ------------------------------------------------------------------------------------- |
-| Auth       | `POST /auth/register`, `/auth/login`, `/auth/refresh`, `/auth/logout`, `GET /auth/me` |
-| Workspaces | `POST                                                                                 | GET /workspaces`, `GET                                                      | PATCH                                            | DELETE /workspaces/:workspaceId`                                 |
-| Members    | `GET                                                                                  | POST /workspaces/:workspaceId/members`, `PATCH                              | DELETE /workspaces/:workspaceId/members/:userId` |
-| Projects   | `POST                                                                                 | GET /workspaces/:workspaceId/projects`, `GET                                | PATCH                                            | DELETE /projects/:projectId`, `POST /projects/:projectId/archive | unarchive`                                                                                                      |
-| Tasks      | `POST                                                                                 | GET /projects/:projectId/tasks`, `GET /workspaces/:workspaceId/tasks`, `GET | PATCH                                            | DELETE /tasks/:taskId`, `PATCH /tasks/:taskId/status             | assignee`, `GET /tasks/:taskId/subtasks`, `POST /tasks/:taskId/labels`, `DELETE /tasks/:taskId/labels/:labelId` |
-| Labels     | `GET                                                                                  | POST /workspaces/:workspaceId/labels`, `PATCH                               | DELETE /labels/:labelId`                         |
-| Comments   | `GET                                                                                  | POST /tasks/:taskId/comments`, `PATCH                                       | DELETE /comments/:commentId`                     |
-| Activity   | `GET /workspaces/:workspaceId/activity`                                               |
+### Auth
+
+- `POST /auth/register`, `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`
+- `GET /auth/me`
+
+### Workspaces and members
+
+- `POST /workspaces`, `GET /workspaces`
+- `GET /workspaces/:workspaceId`, `PATCH /workspaces/:workspaceId`, `DELETE /workspaces/:workspaceId`
+- `GET /workspaces/:workspaceId/members`, `POST /workspaces/:workspaceId/members`
+- `PATCH /workspaces/:workspaceId/members/:userId`, `DELETE /workspaces/:workspaceId/members/:userId`
+
+### Projects
+
+- `POST /workspaces/:workspaceId/projects`, `GET /workspaces/:workspaceId/projects`
+- `GET /projects/:projectId`, `PATCH /projects/:projectId`, `DELETE /projects/:projectId`
+- `POST /projects/:projectId/archive`, `POST /projects/:projectId/unarchive`
+
+### Tasks
+
+- `POST /projects/:projectId/tasks`, `GET /projects/:projectId/tasks`
+- `GET /workspaces/:workspaceId/tasks`
+- `GET /tasks/:taskId`, `PATCH /tasks/:taskId`, `DELETE /tasks/:taskId`
+- `PATCH /tasks/:taskId/status`, `PATCH /tasks/:taskId/assignee`
+- `GET /tasks/:taskId/subtasks`
+- `POST /tasks/:taskId/labels`, `DELETE /tasks/:taskId/labels/:labelId`
+
+### Labels, comments, activity
+
+- `GET /workspaces/:workspaceId/labels`, `POST /workspaces/:workspaceId/labels`
+- `PATCH /labels/:labelId`, `DELETE /labels/:labelId`
+- `GET /tasks/:taskId/comments`, `POST /tasks/:taskId/comments`
+- `PATCH /comments/:commentId`, `DELETE /comments/:commentId`
+- `GET /workspaces/:workspaceId/activity`
 
 ### Roles
 
@@ -131,7 +198,7 @@ Task list filters: `status`, `priority` (repeatable), `assigneeId` (a uuid, or
 `me`/`unassigned`), `projectId`, `labelId`, `parentTaskId`, `topLevelOnly`,
 `dueBefore`, `dueAfter`, `search`, and `sort` (prefix with `-` to reverse).
 
-## Notes
+## Implementation notes
 
 - Refresh tokens are opaque random strings stored as HMACs and rotated on every
   refresh; replaying a used one fails.
