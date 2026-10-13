@@ -1,0 +1,15 @@
+node_modules/
+dist/
+src/generated/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+
+# Duplicate copies of the Prisma CLI skills that `prisma init` writes;
+# .agents/skills is the one we keep.
+.claude/
+.windsurf/
+
+/src/generated/prisma
