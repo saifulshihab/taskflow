@@ -1,6 +1,7 @@
 dist
 node_modules
 .agents
+web
 src/generated
 prisma/migrations
 package-lock.json

@@ -26,5 +26,32 @@ services:
     stdin_open: true
     tty: true
 
+  web:
+    build: ./web
+    image: taskflow-web-dev
+    environment:
+      # Container-to-container over the Compose network. Only the Next server
+      # talks to the API; the browser only ever talks to Next.
+      API_URL: http://api:4000/api
+      NODE_ENV: development
+      # Docker Desktop's filesystem does not deliver inotify events reliably,
+      # so the dev server polls instead.
+      WATCHPACK_POLLING: "true"
+      CHOKIDAR_USEPOLLING: "true"
+    ports:
+      # Host port is configurable because 3000 is often already taken.
+      - "${WEB_PORT:-3100}:3000"
+    volumes:
+      - ./web:/app
+      - web_node_modules:/app/node_modules
+      - web_next:/app/.next
+    command: npm run dev -- --hostname 0.0.0.0
+    depends_on:
+      - api
+    stdin_open: true
+    tty: true
+
 volumes:
   node_modules:
+  web_node_modules:
+  web_next:

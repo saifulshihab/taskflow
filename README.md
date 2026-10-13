@@ -14,6 +14,20 @@ docker compose up -d           # API on http://localhost:4000
 curl localhost:4000/health     # {"status":"ok","database":"up"}
 ```
 
+The web UI is a Next.js app in `web/`. With Compose up it is served on
+`http://localhost:${WEB_PORT:-3100}` (see `.env.example`). The container talks
+to the API at `http://api:4000/api`; when you run `npm run dev` in `web/` on
+the host, set `API_URL=http://localhost:4000/api`.
+
+```bash
+docker compose up -d           # api + web
+open http://localhost:3100       # sign in with a seeded account
+```
+
+Auth uses httpOnly cookies (BFF): `web/src/proxy.ts` refreshes access tokens
+before Server Components run, and Server Actions call the same REST API via
+`web/src/lib/api.ts`.
+
 First time only, or after changing dependencies:
 
 ```bash
@@ -27,6 +41,7 @@ Docker volume rather than on your host:
 
 ```bash
 docker compose exec api npm run typecheck
+docker compose exec web npx tsc --noEmit
 docker compose exec api npx prisma migrate dev --name <name>
 docker compose logs -f api
 ```

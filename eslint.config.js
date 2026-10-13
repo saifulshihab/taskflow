@@ -1,7 +1,8 @@
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist", "node_modules", "src/generated"] },
+  // web/ is the Next.js app; it has its own eslint config.
+  { ignores: ["dist", "node_modules", "src/generated", "web"] },
   ...tseslint.configs.recommended,
   {
     rules: {
