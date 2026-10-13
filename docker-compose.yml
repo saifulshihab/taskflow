@@ -1,3 +1,7 @@
+# Pinned so the project name (and therefore the node_modules volume and
+# container names) does not change if the directory is renamed or cloned.
+name: taskflow
+
 services:
   api:
     build: .
