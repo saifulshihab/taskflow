@@ -7,16 +7,20 @@ RUN apt-get update \
 
 WORKDIR /app
 
-# 1. Copy package files first
-COPY package*.json ./
+# Install from the lockfile for a reproducible image.
+COPY package.json package-lock.json ./
 
-# 2. Clean install your dependencies inside the Linux container
-RUN npm install
+RUN npm ci
 
-# 3. Copy the rest of your project files
+# The generated client is ignored by Git, so create it before compiling the API.
 COPY . .
+RUN npm run db:generate && npm run build
 
 RUN chown -R node:node /app
 USER node
 
-CMD ["npm", "run", "dev"]
+ENV NODE_ENV=production
+EXPOSE 4000
+
+# Production migrations run in GitHub Actions after CI passes.
+CMD ["npm", "run", "start"]
