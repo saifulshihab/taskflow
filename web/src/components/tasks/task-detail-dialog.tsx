@@ -32,9 +32,19 @@ export function TaskDetailDialog({
   previewTitle?: string;
 }) {
   const router = useRouter();
-  const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
-  const [context, setContext] = useState<TaskDetailContext | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [selection, setSelection] = useState<{
+    rootTaskId: string;
+    selectedTaskId: string;
+  } | null>(null);
+  const activeTaskId =
+    selection?.rootTaskId === taskId ? selection.selectedTaskId : taskId;
+  const [detail, setDetail] = useState<{
+    taskId: string;
+    context: TaskDetailContext | null;
+    error: string | null;
+  } | null>(null);
+  const context = detail?.taskId === activeTaskId ? detail.context : null;
+  const error = detail?.taskId === activeTaskId ? detail.error : null;
   const [loading, startLoad] = useTransition();
 
   const load = useCallback(
@@ -42,29 +52,26 @@ export function TaskDetailDialog({
       startLoad(async () => {
         const result = await fetchTaskDetailContext(workspaceId, id);
         if ("error" in result) {
-          setError(result.error);
-          setContext(null);
+          setDetail({ taskId: id, context: null, error: result.error });
           return;
         }
-        setError(null);
-        setContext(result);
+        setDetail({ taskId: id, context: result, error: null });
       });
     },
     [workspaceId],
   );
 
   useEffect(() => {
-    if (open && taskId) setActiveTaskId(taskId);
-  }, [open, taskId]);
-
-  useEffect(() => {
-    if (!open || !activeTaskId) {
-      setContext(null);
-      setError(null);
-      return;
-    }
-    load(activeTaskId);
+    if (open && activeTaskId) load(activeTaskId);
   }, [open, activeTaskId, load]);
+
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen) {
+      setSelection(null);
+      setDetail(null);
+    }
+    onOpenChange(nextOpen);
+  };
 
   const refresh = useCallback(() => {
     router.refresh();
@@ -78,7 +85,7 @@ export function TaskDetailDialog({
     context?.task.title ?? previewTitle ?? (loading ? "Loading…" : "Task");
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
         className="flex max-h-[min(92vh,900px)] flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl"
         showCloseButton
@@ -88,7 +95,7 @@ export function TaskDetailDialog({
             <Link
               href={detailHref}
               className="hover:underline"
-              onClick={() => onOpenChange(false)}
+              onClick={() => handleOpenChange(false)}
             >
               {title}
             </Link>
@@ -102,7 +109,7 @@ export function TaskDetailDialog({
             <Link
               href={detailHref}
               className={buttonVariants({ variant: "link", size: "sm" })}
-              onClick={() => onOpenChange(false)}
+              onClick={() => handleOpenChange(false)}
             >
               Open full page
             </Link>
@@ -135,9 +142,11 @@ export function TaskDetailDialog({
               canModerateComments={context.canModerateComments}
               onMutate={refresh}
               deleteMode="close"
-              onDeleted={() => onOpenChange(false)}
+              onDeleted={() => handleOpenChange(false)}
               subtaskLinkMode="modal"
-              onSubtaskSelect={setActiveTaskId}
+              onSubtaskSelect={(selectedTaskId) => {
+                if (taskId) setSelection({ rootTaskId: taskId, selectedTaskId });
+              }}
             />
           )}
         </div>

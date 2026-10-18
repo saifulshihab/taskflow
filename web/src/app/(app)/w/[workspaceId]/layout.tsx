@@ -2,6 +2,8 @@ import { Suspense } from "react";
 import { MobileNav } from "@/components/app-shell/mobile-nav";
 import { SidebarContent, SidebarSkeleton } from "@/components/app-shell/sidebar";
 
+export const instant = false;
+
 export default async function WorkspaceLayout({
   children,
   params,

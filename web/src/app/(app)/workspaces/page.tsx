@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { createWorkspaceAction } from "@/lib/actions/workspaces";
 import { listWorkspaces } from "@/lib/data";
 
+export const instant = false;
 export const metadata = { title: "Workspaces | TaskFlow" };
 
 export default async function WorkspacesPage() {

@@ -1,4 +1,8 @@
 node_modules
+web
+.agents
+.github
+requests
 dist
 src/generated
 .git

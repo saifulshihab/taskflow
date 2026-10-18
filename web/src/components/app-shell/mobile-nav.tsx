@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useState } from "react";
 import { usePathname } from "next/navigation";
 import { MenuIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -28,13 +28,12 @@ function MobileNavFallback() {
 }
 
 function MobileNavSheet({ children }: { children: React.ReactNode }) {
-  const [open, setOpen] = useState(false);
   const pathname = usePathname();
-
-  useEffect(() => setOpen(false), [pathname]);
+  const [menu, setMenu] = useState({ pathname, open: false });
+  const open = menu.pathname === pathname && menu.open;
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
+    <Sheet open={open} onOpenChange={(nextOpen) => setMenu({ pathname, open: nextOpen })}>
       <SheetTrigger
         render={<Button variant="ghost" size="icon" aria-label="Open menu" />}
       >

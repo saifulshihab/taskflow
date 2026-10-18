@@ -89,17 +89,17 @@ function CommentItem({
 }) {
   const canDelete = comment.author.id === currentUserId || canModerate;
   const [editing, setEditing] = useState(false);
-  const [state, action] = useActionState<FormState, FormData>(
-    updateCommentAction,
+  const [, action] = useActionState<FormState, FormData>(
+    async (previousState, formData) => {
+      const result = await updateCommentAction(previousState, formData);
+      if (result.ok) {
+        setEditing(false);
+        onMutate?.();
+      }
+      return result;
+    },
     {},
   );
-
-  useEffect(() => {
-    if (state.ok) {
-      setEditing(false);
-      onMutate?.();
-    }
-  }, [state.ok, onMutate]);
 
   const onDelete = () => {
     const formData = new FormData();

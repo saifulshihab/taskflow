@@ -44,9 +44,10 @@ docker compose exec api npm run db:migrate  # apply the checked-in migrations
 curl localhost:4000/health       # {"status":"ok","database":"up"}
 ```
 
-The API container generates the Prisma client on startup in the bind-mounted
-source tree. This is necessary because `src/generated/prisma` is ignored by Git
-and is not available in a fresh checkout.
+The API Dockerfile generates the Prisma client and compiles the API while
+building the image. Compose also regenerates the client at startup because its
+development bind mount hides generated files from the image. The Dockerfile's
+default command runs the compiled API; Compose overrides it with the dev server.
 
 Open the UI at `http://localhost:${WEB_PORT:-3100}` and register an account.
 Existing data in a local database is not copied by the migration command.
@@ -100,6 +101,30 @@ Both values come from the same database in Prisma Console and require TLS.
 them before running against a database with data. To create a new migration with
 `npm run db:migrate:dev -- --name <name>`, configure `SHADOW_DATABASE_URL` for a
 **separate disposable database** first; never point it at the main database.
+
+### GitHub CI and Vercel deployment
+
+GitHub Actions runs API and web checks on pull requests and pushes to `main`.
+After both checks pass on `main`, the workflow runs `prisma migrate deploy`
+against the production database. It applies only committed migrations; it does
+not run the destructive seed script. Add `DIRECT_URL` as a GitHub Actions secret
+using the **direct connection URL for the production database**. Pull requests
+do not receive this secret or run migrations.
+The Docker image build does not connect to the database or apply migrations.
+
+Deploy the Express API on a separate host. Configure its `DATABASE_URL` with
+the pooled Prisma Postgres URL and set `JWT_ACCESS_SECRET` and
+`JWT_REFRESH_SECRET` there. Import this repository into Vercel as a Next.js
+project with **Root Directory** set to `web`. Set Vercel's server-side
+`API_URL` to the deployed API's HTTPS URL ending in `/api` (for example,
+`https://api.example.com/api`). The web app does not need database credentials.
+
+Vercel deploys from GitHub automatically. In the Vercel project's production
+**Deployment Checks**, require the GitHub Action named **Production database
+migrations**. This prevents a successful Vercel build from being promoted to
+production until the CI checks and database migration job pass. Without that
+setting, Vercel's deployment can reach production before the GitHub workflow
+finishes.
 
 ### Seeded accounts
 
