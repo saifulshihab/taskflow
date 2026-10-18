@@ -1,8 +1,7 @@
 import { PageHeader } from "@/components/page-header";
-import { Button } from "@/components/ui/button";
-import { deleteWorkspaceFormAction } from "@/lib/actions/workspaces";
 import { getWorkspace } from "@/lib/data";
 import { can } from "@/lib/rbac";
+import { DeleteWorkspaceDialog } from "./delete-workspace-dialog";
 import { WorkspaceSettingsForm } from "./settings-form";
 
 export default async function WorkspaceSettingsPage({
@@ -30,24 +29,16 @@ export default async function WorkspaceSettingsPage({
         )}
 
         {canDelete && (
-          <form
-            action={deleteWorkspaceFormAction}
-            className="rounded-xl border border-destructive/30 p-4"
-          >
-            <input type="hidden" name="workspaceId" value={workspaceId} />
+          <section className="rounded-xl border border-destructive/30 p-4">
             <h2 className="font-medium text-destructive">Danger zone</h2>
             <p className="text-muted-foreground mt-1 text-sm">
               Deleting a workspace removes all projects, tasks, and activity.
             </p>
-            <Button
-              type="submit"
-              variant="destructive"
-              size="sm"
-              className="mt-4"
-            >
-              Delete workspace
-            </Button>
-          </form>
+            <DeleteWorkspaceDialog
+              workspaceId={workspaceId}
+              workspaceName={workspace.name}
+            />
+          </section>
         )}
       </div>
     </>

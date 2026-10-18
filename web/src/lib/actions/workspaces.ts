@@ -53,18 +53,18 @@ export async function updateWorkspaceAction(
   return { ok: true };
 }
 
-/** Form-friendly wrapper: React form actions must return void. */
-export async function deleteWorkspaceFormAction(formData: FormData) {
-  const result = await deleteWorkspaceAction(formData);
-  if (result.error) throw new Error(result.error);
-}
-
 export async function deleteWorkspaceAction(
+  _previous: FormState,
   formData: FormData,
 ): Promise<FormState> {
   const workspaceId = field(formData, "workspaceId");
 
   try {
+    const workspace = await api<Workspace>(`/workspaces/${workspaceId}`);
+    if (field(formData, "confirmation") !== workspace.name) {
+      return { error: `Type ${workspace.name} to confirm deletion.` };
+    }
+
     await api(`/workspaces/${workspaceId}`, { method: "DELETE" });
   } catch (error) {
     return toFormState(error);
