@@ -22,5 +22,5 @@ USER node
 ENV NODE_ENV=production
 EXPOSE 4000
 
-# Production migrations run in GitHub Actions after CI passes.
-CMD ["npm", "run", "start"]
+# Apply committed migrations before the API accepts requests.
+CMD ["sh", "-c", "npm run db:migrate && exec npm run start"]

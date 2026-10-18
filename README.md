@@ -45,9 +45,11 @@ curl localhost:4000/health       # {"status":"ok","database":"up"}
 ```
 
 The API Dockerfile generates the Prisma client and compiles the API while
-building the image. Compose also regenerates the client at startup because its
-development bind mount hides generated files from the image. The Dockerfile's
-default command runs the compiled API; Compose overrides it with the dev server.
+building the image. Its default command applies committed migrations before
+starting the compiled API. Compose overrides that command with the dev server,
+so run the migration command shown above for local development. Compose also
+regenerates the client at startup because its development bind mount hides
+generated files from the image.
 
 Open the UI at `http://localhost:${WEB_PORT:-3100}` and register an account.
 Existing data in a local database is not copied by the migration command.
@@ -105,26 +107,22 @@ them before running against a database with data. To create a new migration with
 ### GitHub CI and Vercel deployment
 
 GitHub Actions runs API and web checks on pull requests and pushes to `main`.
-After both checks pass on `main`, the workflow runs `prisma migrate deploy`
-against the production database. It applies only committed migrations; it does
-not run the destructive seed script. Add `DIRECT_URL` as a GitHub Actions secret
-using the **direct connection URL for the production database**. Pull requests
-do not receive this secret or run migrations.
-The Docker image build does not connect to the database or apply migrations.
+The API Docker image build does not connect to the database. When a production
+container starts, it runs `prisma migrate deploy` before accepting requests.
+This applies only committed migrations; it does not run the destructive seed
+script. Set `DIRECT_URL` on the API host to the **direct connection URL for the
+production database**. The API container also needs `DATABASE_URL` for its
+pooled application queries.
 
-Deploy the Express API on a separate host. Configure its `DATABASE_URL` with
-the pooled Prisma Postgres URL and set `JWT_ACCESS_SECRET` and
+Deploy the Express API on a separate host. Set `JWT_ACCESS_SECRET` and
 `JWT_REFRESH_SECRET` there. Import this repository into Vercel as a Next.js
 project with **Root Directory** set to `web`. Set Vercel's server-side
 `API_URL` to the deployed API's HTTPS URL ending in `/api` (for example,
 `https://api.example.com/api`). The web app does not need database credentials.
 
-Vercel deploys from GitHub automatically. In the Vercel project's production
-**Deployment Checks**, require the GitHub Action named **Production database
-migrations**. This prevents a successful Vercel build from being promoted to
-production until the CI checks and database migration job pass. Without that
-setting, Vercel's deployment can reach production before the GitHub workflow
-finishes.
+Vercel deploys from GitHub automatically. Start the updated API container and
+verify its migration succeeds before promoting web changes that depend on the
+new schema.
 
 ### Seeded accounts
 
