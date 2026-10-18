@@ -117,7 +117,7 @@ function BoardColumn({
       <div
         ref={setNodeRef}
         className={cn(
-          "flex min-h-40 flex-1 flex-col gap-2 rounded-xl border border-dashed p-2 transition-colors",
+          "flex flex-1 flex-col gap-2 rounded-xl border border-dashed p-2 transition-colors",
           isOver && "border-primary/50 bg-primary/5",
         )}
       >
@@ -129,6 +129,11 @@ function BoardColumn({
             onOpenDetails={onOpenDetails}
           />
         ))}
+        {tasks.length === 0 && (
+          <p className="text-muted-foreground flex flex-1 items-center justify-center text-sm">
+            No tasks
+          </p>
+        )}
       </div>
     </div>
   );
@@ -206,7 +211,7 @@ export function TaskBoard({
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
     >
-      <div className="flex gap-4 overflow-x-auto pb-4">
+      <div className="flex flex-1 gap-4 overflow-x-auto pb-4">
         {TASK_STATUSES.map((status) => (
           <BoardColumn
             key={status}

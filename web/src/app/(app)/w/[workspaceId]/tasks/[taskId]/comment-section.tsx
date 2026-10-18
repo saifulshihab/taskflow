@@ -63,7 +63,7 @@ export function CommentSection({
           <input type="hidden" name="taskId" value={taskId} />
           <FormError message={state.error} />
           <Textarea name="body" rows={3} placeholder="Write a comment…" required />
-          <SubmitButton className="h-7 text-xs" pendingText="Posting...">
+          <SubmitButton pendingText="Posting...">
             Post comment
           </SubmitButton>
         </form>
@@ -127,7 +127,7 @@ function CommentItem({
           <input type="hidden" name="commentId" value={comment.id} />
           <Textarea name="body" rows={3} defaultValue={comment.body} required />
           <div className="flex gap-2">
-            <SubmitButton className="h-7 text-xs">Save</SubmitButton>
+            <SubmitButton>Save</SubmitButton>
             <Button
               type="button"
               size="sm"

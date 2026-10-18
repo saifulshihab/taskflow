@@ -10,7 +10,7 @@ export function PageHeader({
   return (
     <div className="flex flex-wrap items-start justify-between gap-3 border-b px-4 py-4 md:px-6">
       <div className="min-w-0">
-        <h1 className="font-heading truncate text-lg font-semibold">{title}</h1>
+        <h1 className="font-heading truncate text-xl font-semibold">{title}</h1>
         {description && (
           <p className="text-muted-foreground text-sm">{description}</p>
         )}

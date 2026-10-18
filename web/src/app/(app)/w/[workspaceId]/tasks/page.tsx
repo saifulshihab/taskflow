@@ -3,6 +3,7 @@ import { PageHeader } from "@/components/page-header";
 import { TaskListFilters } from "@/components/tasks/task-list-filters";
 import { TaskTable } from "@/components/tasks/task-table";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { NativeSelect } from "@/components/native-select";
 import { listLabels, listProjects, listWorkspaceTasks } from "@/lib/data";
 import { parseTaskListQuery, taskQueryToApi } from "@/lib/task-query";
 
@@ -42,11 +43,11 @@ export default async function WorkspaceTasksPage({
                 <input key={`${key}-${item}`} type="hidden" name={key} value={item} />
               ));
             })}
-            <label className="text-sm">
+            <label className="flex items-center gap-2 text-sm">
               Label
-              <select
+              <NativeSelect
                 name="labelId"
-                className="ml-2 rounded-md border px-2 py-1"
+                className="w-40"
                 defaultValue={query.labelId ?? ""}
               >
                 <option value="">Any</option>
@@ -55,9 +56,9 @@ export default async function WorkspaceTasksPage({
                     {label.name}
                   </option>
                 ))}
-              </select>
+              </NativeSelect>
             </label>
-            <Button type="submit" size="sm" variant="secondary">Apply label</Button>
+            <Button type="submit" variant="secondary">Apply label</Button>
           </form>
         )}
         <TaskTable tasks={tasks.data} workspaceId={workspaceId} />

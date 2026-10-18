@@ -27,9 +27,9 @@ export function TaskListFilters({
     : `/w/${workspaceId}/tasks`;
 
   return (
-    <form method="get" action={action} className="space-y-4 rounded-xl border p-4">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="space-y-1.5 sm:col-span-2">
+    <form method="get" action={action} className="space-y-5 rounded-xl border p-5">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="space-y-2 sm:col-span-2">
           <Label htmlFor="search">Search</Label>
           <Input
             id="search"
@@ -39,7 +39,7 @@ export function TaskListFilters({
           />
         </div>
         {!fixedProjectId && (
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             <Label htmlFor="projectId">Project</Label>
             <NativeSelect
               id="projectId"
@@ -55,7 +55,7 @@ export function TaskListFilters({
             </NativeSelect>
           </div>
         )}
-        <div className="space-y-1.5">
+        <div className="space-y-2">
           <Label htmlFor="assigneeId">Assignee</Label>
           <NativeSelect
             id="assigneeId"
@@ -67,7 +67,7 @@ export function TaskListFilters({
             <option value="unassigned">Unassigned</option>
           </NativeSelect>
         </div>
-        <div className="space-y-1.5">
+        <div className="space-y-2">
           <Label htmlFor="status">Status</Label>
           <NativeSelect
             id="status"
@@ -82,7 +82,7 @@ export function TaskListFilters({
             ))}
           </NativeSelect>
         </div>
-        <div className="space-y-1.5">
+        <div className="space-y-2">
           <Label htmlFor="priority">Priority</Label>
           <NativeSelect
             id="priority"
@@ -97,7 +97,7 @@ export function TaskListFilters({
             ))}
           </NativeSelect>
         </div>
-        <div className="space-y-1.5">
+        <div className="space-y-2">
           <Label htmlFor="sort">Sort</Label>
           <NativeSelect id="sort" name="sort" defaultValue={query.sort ?? "-createdAt"}>
             <option value="-createdAt">Newest</option>
@@ -109,7 +109,7 @@ export function TaskListFilters({
             <option value="position">Position</option>
           </NativeSelect>
         </div>
-        <div className="space-y-1.5">
+        <div className="space-y-2">
           <Label htmlFor="dueBefore">Due before</Label>
           <Input
             id="dueBefore"
@@ -118,7 +118,7 @@ export function TaskListFilters({
             defaultValue={query.dueBefore ?? ""}
           />
         </div>
-        <div className="space-y-1.5">
+        <div className="space-y-2">
           <Label htmlFor="dueAfter">Due after</Label>
           <Input
             id="dueAfter"
@@ -128,9 +128,10 @@ export function TaskListFilters({
           />
         </div>
         <div className="flex items-end gap-2">
-          <label className="flex items-center gap-2 text-sm">
+          <label className="flex min-h-10 items-center gap-2 text-sm">
             <input
               type="checkbox"
+              className="size-5 accent-foreground"
               name="topLevelOnly"
               value="true"
               defaultChecked={query.topLevelOnly}
@@ -140,10 +141,10 @@ export function TaskListFilters({
         </div>
       </div>
       <div className="flex gap-2">
-        <Button type="submit" size="sm">Apply</Button>
+        <Button type="submit">Apply</Button>
         <Link
           href={action}
-          className={buttonVariants({ variant: "outline", size: "sm" })}
+          className={buttonVariants({ variant: "outline" })}
         >
           Reset
         </Link>

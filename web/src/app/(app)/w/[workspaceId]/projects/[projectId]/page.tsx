@@ -30,7 +30,7 @@ export default async function ProjectBoardPage({
   const canManage = can(workspace.role, "ADMIN");
 
   return (
-    <>
+    <div className="flex min-h-[calc(100svh-3rem)] flex-col md:min-h-svh">
       <PageHeader
         title={`${project.key} · ${project.name}`}
         description={project.description ?? undefined}
@@ -58,7 +58,7 @@ export default async function ProjectBoardPage({
         )}
       </PageHeader>
 
-      <div className="p-4 md:p-6">
+      <div className="flex flex-1 flex-col p-4 md:p-6">
         <Suspense fallback={<Skeleton className="h-64 w-full" />}>
           <TaskBoard
             tasks={tasks.data}
@@ -67,6 +67,6 @@ export default async function ProjectBoardPage({
           />
         </Suspense>
       </div>
-    </>
+    </div>
   );
 }

@@ -135,7 +135,7 @@ export function TaskEditForm({
 
       <div className="flex flex-wrap gap-2">
         <SubmitButton pendingText="Saving...">Save</SubmitButton>
-        <Button type="button" variant="destructive" size="sm" onClick={onDelete}>
+        <Button type="button" variant="destructive" onClick={onDelete}>
           Delete task
         </Button>
       </div>
