@@ -8,21 +8,14 @@ services:
     image: taskflow-api-dev
     env_file:
       - .env
-    # The local Prisma Postgres server binds to 127.0.0.1 on the host. Docker
-    # Desktop runs containers inside a VM, so `network_mode: host` would mean
-    # the VM, not this machine; host.docker.internal is what actually reaches
-    # the host's loopback. Hence the separate *_CONTAINER connection strings.
-    environment:
-      DATABASE_URL: ${DATABASE_URL_CONTAINER}
-      SHADOW_DATABASE_URL: ${SHADOW_DATABASE_URL_CONTAINER}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     ports:
       - "${PORT:-4000}:${PORT:-4000}"
     volumes:
       - .:/app
       - node_modules:/app/node_modules
-    command: npm run dev
+    # The bind mount hides generated files from the image. Generate the Prisma
+    # client in the mounted source tree before the API imports it.
+    command: sh -c "npm run db:generate && exec npm run dev"
     stdin_open: true
     tty: true
 

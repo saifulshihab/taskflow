@@ -11,10 +11,10 @@ authorization or business rules.
 
 | Layer    | Technologies |
 | -------- | ------------ |
-| API      | Express 5, TypeScript, Zod, Prisma 7, PostgreSQL (Prisma Postgres in dev) |
+| API      | Express 5, TypeScript, Zod, Prisma 7, Prisma Postgres |
 | Web      | Next.js 16, React 19, Tailwind CSS 4, shadcn/ui, dnd-kit |
 | Auth     | JWT access tokens + rotating opaque refresh tokens (argon2 password hashing) |
-| Dev ops  | Docker Compose (API + web), local `prisma dev` for the database |
+| Dev ops  | Docker Compose (API + web), hosted Prisma Postgres |
 
 ## Features
 
@@ -28,28 +28,40 @@ authorization or business rules.
 
 ## Running it
 
-**Prerequisites:** Node.js 20+, Docker, and a copy of `.env` (see `.env.example`).
+**Prerequisites:** Docker, a Prisma Postgres database, and a copy of `.env`
+(see `.env.example`). In Prisma Console, generate both connection strings for
+the same database. Put the pooled string in `DATABASE_URL` and the direct string
+in `DIRECT_URL`. If you already have a `.env`, replace its local database URLs
+and remove the old `*_CONTAINER` and local `SHADOW_DATABASE_URL` entries. Keep
+the credentials in the ignored `.env` file.
 
-Two processes: the database runs on your host, the API and web run in Docker.
+The API and web run in Docker and connect to the hosted database.
 
 ```bash
-cp .env.example .env   # first time; set JWT secrets
-npx prisma@prev dev --detach   # local Prisma Postgres (ports 51214/51215)
-docker compose up -d           # API on http://localhost:4000, web on http://localhost:3100
-curl localhost:4000/health     # {"status":"ok","database":"up"}
+cp .env.example .env             # first time; set both database URLs and JWT secrets
+docker compose up -d --build     # API on http://localhost:4000, web on http://localhost:3100
+docker compose exec api npm run db:migrate  # apply the checked-in migrations
+curl localhost:4000/health       # {"status":"ok","database":"up"}
 ```
 
-Open the UI at `http://localhost:${WEB_PORT:-3100}` and sign in with a seeded
-account (see [Seeded accounts](#seeded-accounts)).
+The API container generates the Prisma client on startup in the bind-mounted
+source tree. This is necessary because `src/generated/prisma` is ignored by Git
+and is not available in a fresh checkout.
+
+Open the UI at `http://localhost:${WEB_PORT:-3100}` and register an account.
+Existing data in a local database is not copied by the migration command.
 
 **First time**, or after changing dependencies:
 
 ```bash
 docker compose run --rm api npm ci
 docker compose run --rm web npm ci
-docker compose exec api npx prisma migrate dev
-docker compose exec api npm run db:seed
+docker compose exec api npm run db:migrate
 ```
+
+The seed is optional and **deletes all existing application data** before
+creating demo accounts. Run `docker compose exec api npm run db:seed` only against
+a disposable database.
 
 ### Web on the host
 
@@ -60,8 +72,8 @@ locally instead:
 cd web && npm ci && API_URL=http://localhost:4000/api npm run dev
 ```
 
-You still need the API and database running (`docker compose up -d api` is enough
-for the API if you use host `DATABASE_URL` only inside the container).
+You still need the API running (`docker compose up -d api` is enough) and valid
+Prisma Postgres credentials in the API container's `.env`.
 
 Auth uses httpOnly cookies (BFF): `web/src/proxy.ts` refreshes access tokens
 before Server Components run, and Server Actions call the REST API via
@@ -74,18 +86,20 @@ before Server Components run, and Server Actions call the REST API via
 ```bash
 docker compose exec api npm run typecheck
 docker compose exec web npx tsc --noEmit
-docker compose exec api npx prisma migrate dev --name <name>
+docker compose exec api npm run db:migrate
 docker compose logs -f api
 docker compose logs -f web
 ```
 
-### Why two connection strings
+### Database connections and migrations
 
-`prisma dev` binds to `127.0.0.1`, and Docker Desktop runs containers inside a
-VM, so a container cannot reach that address directly. `.env` therefore carries
-both `DATABASE_URL` (localhost, for Prisma CLI on your host) and
-`DATABASE_URL_CONTAINER` (`host.docker.internal`), which `docker-compose.yml`
-maps onto `DATABASE_URL` inside the container.
+`DATABASE_URL` is Prisma Postgres's pooled connection for API queries.
+`DIRECT_URL` connects directly for Prisma CLI commands such as migrations.
+Both values come from the same database in Prisma Console and require TLS.
+`npm run db:migrate` applies the migration files in `prisma/migrations`; review
+them before running against a database with data. To create a new migration with
+`npm run db:migrate:dev -- --name <name>`, configure `SHADOW_DATABASE_URL` for a
+**separate disposable database** first; never point it at the main database.
 
 ### Seeded accounts
 

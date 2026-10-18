@@ -15,7 +15,8 @@ export default {
     seed: "tsx src/seed.ts",
   },
   datasource: {
-    url: process.env["DATABASE_URL"],
+    // CLI commands use the direct connection; the API uses DATABASE_URL.
+    url: process.env["DIRECT_URL"],
     shadowDatabaseUrl: process.env["SHADOW_DATABASE_URL"],
   },
 } satisfies PrismaConfig;

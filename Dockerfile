@@ -1,14 +1,22 @@
 FROM node:24-slim
 
-# argon2 is a native addon; these are needed when no prebuilt binary matches.
+# Install system build dependencies for native addons like argon2
 RUN apt-get update \
     && apt-get install -y --no-install-recommends build-essential python3 openssl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Pre-create node_modules so the named volume mounted there inherits node's ownership.
-RUN mkdir -p /app/node_modules && chown -R node:node /app
-
 WORKDIR /app
+
+# 1. Copy package files first
+COPY package*.json ./
+
+# 2. Clean install your dependencies inside the Linux container
+RUN npm install
+
+# 3. Copy the rest of your project files
+COPY . .
+
+RUN chown -R node:node /app
 USER node
 
 CMD ["npm", "run", "dev"]
