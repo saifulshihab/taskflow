@@ -1,5 +1,26 @@
 import type { QueryClient } from "@tanstack/react-query";
+import type { Paginated, Task } from "./api-types";
 import { queryKeys } from "./query-keys";
+
+/** Immediate board/list update; invalidation alone races with useOptimistic reset. */
+export function patchTaskInProjectTasksCache(
+  queryClient: QueryClient,
+  projectId: string,
+  updated: Task,
+) {
+  queryClient.setQueriesData<Paginated<Task>>(
+    { queryKey: ["projectTasks", projectId] },
+    (current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        data: current.data.map((task) =>
+          task.id === updated.id ? updated : task,
+        ),
+      };
+    },
+  );
+}
 
 export function invalidateWorkspaceShell(
   queryClient: QueryClient,

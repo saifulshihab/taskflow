@@ -3,6 +3,7 @@ import type { Priority, Task, TaskStatus } from "@/lib/api-types";
 import {
   invalidateProjectViews,
   invalidateTaskViews,
+  patchTaskInProjectTasksCache,
 } from "@/lib/invalidate";
 import { getQueryClient } from "@/lib/query-client";
 import {
@@ -115,7 +116,9 @@ export async function setTaskStatusAction(
       method: "PATCH",
       body: { status },
     });
-    invalidateProjectViews(getQueryClient(), workspaceId, projectId);
+    const qc = getQueryClient();
+    patchTaskInProjectTasksCache(qc, projectId, task);
+    invalidateProjectViews(qc, workspaceId, projectId);
     return { ok: true, task };
   } catch (error) {
     return {

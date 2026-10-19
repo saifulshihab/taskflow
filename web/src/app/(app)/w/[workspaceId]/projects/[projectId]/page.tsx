@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { createTaskAction } from "@/lib/actions/tasks";
-import { useProject, useProjectTasks, useWorkspace } from "@/lib/queries";
+import { useProject, useWorkspace } from "@/lib/queries";
 import { can } from "@/lib/rbac";
 
 export default function ProjectBoardPage() {
@@ -21,27 +21,15 @@ export default function ProjectBoardPage() {
 
   const projectQuery = useProject(projectId);
   const workspaceQuery = useWorkspace(workspaceId);
-  const tasksQuery = useProjectTasks(projectId, {
-    pageSize: 100,
-    topLevelOnly: true,
-    sort: "position",
-  });
-
-  if (
-    projectQuery.isPending ||
-    workspaceQuery.isPending ||
-    tasksQuery.isPending
-  ) {
+  if (projectQuery.isPending || workspaceQuery.isPending) {
     return <Skeleton className="m-6 h-64 w-full" />;
   }
 
   if (
     projectQuery.isError ||
     workspaceQuery.isError ||
-    tasksQuery.isError ||
     !projectQuery.data ||
-    !workspaceQuery.data ||
-    !tasksQuery.data
+    !workspaceQuery.data
   ) {
     return (
       <p className="text-destructive p-6 text-sm">Could not load project board.</p>
@@ -83,11 +71,7 @@ export default function ProjectBoardPage() {
       </PageHeader>
 
       <div className="flex flex-1 flex-col p-4 md:p-6">
-        <TaskBoard
-          tasks={tasksQuery.data.data}
-          workspaceId={workspaceId}
-          projectId={projectId}
-        />
+        <TaskBoard workspaceId={workspaceId} projectId={projectId} />
       </div>
     </div>
   );

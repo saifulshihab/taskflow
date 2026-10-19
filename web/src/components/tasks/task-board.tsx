@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useOptimistic, useState, useTransition } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -14,16 +15,25 @@ import {
 } from "@dnd-kit/core";
 import { toast } from "sonner";
 import { PriorityBadge } from "@/components/tasks/task-badges";
-import { setTaskStatusAction } from "@/lib/actions/tasks";
+import { apiClient } from "@/lib/api-client";
 import {
   TASK_STATUSES,
   type Task,
   type TaskStatus,
 } from "@/lib/api-types";
+import { patchTaskInProjectTasksCache } from "@/lib/invalidate";
+import { queryKeys } from "@/lib/query-keys";
+import { useProjectTasks } from "@/lib/queries";
 import { TASK_STATUS_LABELS } from "@/lib/format";
 import { TaskDetailDialog } from "@/components/tasks/task-detail-dialog";
 import { TaskTitleNav } from "@/components/tasks/task-title-nav";
 import { cn } from "cn";
+
+const boardTasksQuery = {
+  pageSize: 100,
+  topLevelOnly: true,
+  sort: "position",
+} as const;
 
 function BoardCard({
   task,
@@ -140,44 +150,76 @@ function BoardColumn({
 }
 
 export function TaskBoard({
-  tasks,
   workspaceId,
   projectId,
 }: {
-  tasks: Task[];
   workspaceId: string;
   projectId: string;
 }) {
+  const queryClient = useQueryClient();
+  const tasksQuery = useProjectTasks(projectId, boardTasksQuery);
+
   const [activeId, setActiveId] = useState<string | null>(null);
   const [detailTaskId, setDetailTaskId] = useState<string | null>(null);
   const [detailPreviewTitle, setDetailPreviewTitle] = useState<string>();
-  const [, startTransition] = useTransition();
 
-  const [optimisticTasks, setOptimisticTasks] = useOptimistic(
-    tasks,
-    (current, update: { id: string; status: TaskStatus }) =>
-      current.map((task) =>
-        task.id === update.id ? { ...task, status: update.status } : task,
-      ),
-  );
+  const statusMutation = useMutation({
+    mutationFn: async ({
+      taskId,
+      status,
+    }: {
+      taskId: string;
+      status: TaskStatus;
+    }) =>
+      apiClient<Task>(`/tasks/${taskId}/status`, {
+        method: "PATCH",
+        body: { status },
+      }),
+    onMutate: async ({ taskId, status }) => {
+      const key = queryKeys.projectTasks(projectId, boardTasksQuery);
+      await queryClient.cancelQueries({ queryKey: key });
+      const previous = queryClient.getQueryData(key);
+      queryClient.setQueryData(key, (current: typeof tasksQuery.data) => {
+        if (!current) return current;
+        return {
+          ...current,
+          data: current.data.map((task) =>
+            task.id === taskId ? { ...task, status } : task,
+          ),
+        };
+      });
+      return { previous, key };
+    },
+    onError: (_error, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(context.key, context.previous);
+      }
+      toast.error("Could not update status");
+    },
+    onSuccess: (updated) => {
+      patchTaskInProjectTasksCache(queryClient, projectId, updated);
+    },
+  });
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-  );
+  const displayTasks = tasksQuery.data?.data ?? [];
 
   const byStatus = useMemo(() => {
     const map = Object.fromEntries(
       TASK_STATUSES.map((status) => [status, [] as Task[]]),
     ) as Record<TaskStatus, Task[]>;
-    for (const task of optimisticTasks) {
+    for (const task of displayTasks) {
       map[task.status].push(task);
     }
     return map;
-  }, [optimisticTasks]);
+  }, [displayTasks]);
 
   const activeTask = activeId
-    ? optimisticTasks.find((task) => task.id === activeId)
+    ? displayTasks.find((task) => task.id === activeId)
     : undefined;
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+  );
 
   const onDragStart = (event: DragStartEvent) => {
     setActiveId(String(event.active.id));
@@ -187,23 +229,23 @@ export function TaskBoard({
     setActiveId(null);
     const taskId = String(event.active.id);
     const nextStatus = event.over?.id as TaskStatus | undefined;
-    const task = optimisticTasks.find((item) => item.id === taskId);
+    const task = displayTasks.find((item) => item.id === taskId);
     if (!task || !nextStatus || task.status === nextStatus) return;
 
-    startTransition(async () => {
-      setOptimisticTasks({ id: taskId, status: nextStatus });
-      const result = await setTaskStatusAction(
-        taskId,
-        nextStatus,
-        workspaceId,
-        projectId,
-      );
-      if (!result.ok) {
-        toast.error(result.error);
-        setOptimisticTasks({ id: taskId, status: task.status });
-      }
-    });
+    statusMutation.mutate({ taskId, status: nextStatus });
   };
+
+  if (tasksQuery.isPending) {
+    return (
+      <p className="text-muted-foreground text-sm">Loading board…</p>
+    );
+  }
+
+  if (tasksQuery.isError) {
+    return (
+      <p className="text-destructive text-sm">Could not load tasks.</p>
+    );
+  }
 
   return (
     <DndContext
