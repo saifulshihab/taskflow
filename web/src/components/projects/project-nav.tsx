@@ -10,7 +10,7 @@ export function ProjectNav({
   projectId: string;
   active: "board" | "list";
 }) {
-  const base = `/w/${workspaceId}/projects/${projectId}`;
+  const base = `/w/${workspaceId}/board/${projectId}`;
   const items = [
     { href: base, label: "Board", key: "board" as const },
     { href: `${base}/list`, label: "List", key: "list" as const },

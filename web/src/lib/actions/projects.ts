@@ -36,7 +36,7 @@ export async function createProjectAction(
   void getQueryClient().invalidateQueries({
     queryKey: queryKeys.projects(workspaceId),
   });
-  return { ok: true, redirect: `/w/${workspaceId}/projects/${project.id}` };
+  return { ok: true, redirect: `/w/${workspaceId}/board/${project.id}` };
 }
 
 export async function updateProjectAction(
@@ -110,5 +110,5 @@ export async function deleteProjectAction(formData: FormData): Promise<FormState
   void getQueryClient().invalidateQueries({
     queryKey: queryKeys.projects(workspaceId),
   });
-  return { ok: true, redirect: `/w/${workspaceId}` };
+  return { ok: true, redirect: `/w/${workspaceId}/projects` };
 }

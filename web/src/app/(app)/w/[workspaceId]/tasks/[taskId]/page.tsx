@@ -25,7 +25,7 @@ export default function TaskDetailPage() {
   if (isPending) return <Skeleton className="m-6 h-96 w-full" />;
   if (isError || !context) notFound();
 
-  const projectHref = `/w/${workspaceId}/projects/${context.task.projectId}`;
+  const projectHref = `/w/${workspaceId}/board/${context.task.projectId}`;
 
   const refresh = () => {
     void queryClient.invalidateQueries({

@@ -100,7 +100,7 @@ export async function deleteTaskAction(formData: FormData): Promise<FormState> {
   return {
     ok: true,
     redirect: projectId
-      ? `/w/${workspaceId}/projects/${projectId}`
+      ? `/w/${workspaceId}/board/${projectId}`
       : `/w/${workspaceId}/tasks`,
   };
 }

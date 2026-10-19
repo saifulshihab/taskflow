@@ -29,7 +29,7 @@ export async function createWorkspaceAction(
   }
 
   void getQueryClient().invalidateQueries({ queryKey: queryKeys.workspaces() });
-  return { ok: true, redirect: `/w/${workspace.id}` };
+  return { ok: true, redirect: `/w/${workspace.id}/board` };
 }
 
 export async function updateWorkspaceAction(

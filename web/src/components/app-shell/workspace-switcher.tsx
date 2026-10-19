@@ -50,7 +50,7 @@ export function WorkspaceSwitcher({
           {workspaces.map((workspace) => (
             <DropdownMenuItem
               key={workspace.id}
-              onClick={() => router.push(`/w/${workspace.id}`)}
+              onClick={() => router.push(`/w/${workspace.id}/board`)}
             >
               <span className="truncate">{workspace.name}</span>
               {workspace.id === current.id && (

@@ -2,7 +2,7 @@
 
 import {
   ActivityIcon,
-  FolderKanbanIcon,
+  KanbanIcon,
   ListChecksIcon,
   SettingsIcon,
   TagIcon,
@@ -17,7 +17,7 @@ import { WorkspaceSwitcher } from "./workspace-switcher";
 function navItems(workspaceId: string) {
   const base = `/w/${workspaceId}`;
   return [
-    { href: base, label: "Projects", icon: FolderKanbanIcon, exact: true },
+    { href: `${base}/board`, label: "Board", icon: KanbanIcon, exact: false },
     { href: `${base}/tasks`, label: "Tasks", icon: ListChecksIcon },
     { href: `${base}/labels`, label: "Labels", icon: TagIcon },
     { href: `${base}/members`, label: "Members", icon: UsersIcon },

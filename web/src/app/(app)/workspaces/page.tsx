@@ -59,7 +59,7 @@ export default function WorkspacesPage() {
             {data.data.map((workspace) => (
               <li key={workspace.id}>
                 <Link
-                  href={`/w/${workspace.id}`}
+                  href={`/w/${workspace.id}/board`}
                   className="flex items-center justify-between px-4 py-3 hover:bg-muted/50"
                 >
                   <div>

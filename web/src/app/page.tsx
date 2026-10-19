@@ -15,7 +15,7 @@ export default function HomePage() {
       return;
     }
     const first = data?.data[0];
-    router.replace(first ? `/w/${first.id}` : "/workspaces");
+    router.replace(first ? `/w/${first.id}/board` : "/workspaces");
   }, [data, isError, isPending, router]);
 
   return (

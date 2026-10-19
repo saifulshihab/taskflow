@@ -23,7 +23,7 @@ export function TaskListFilters({
   fixedProjectId?: string;
 }) {
   const action = fixedProjectId
-    ? `/w/${workspaceId}/projects/${fixedProjectId}/list`
+    ? `/w/${workspaceId}/board/${fixedProjectId}/list`
     : `/w/${workspaceId}/tasks`;
 
   return (
