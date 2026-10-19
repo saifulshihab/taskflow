@@ -1,10 +1,8 @@
-"use server";
-
-import { redirect } from "next/navigation";
-import { api } from "@/lib/api";
+import { apiClient } from "@/lib/api-client";
 import type { AuthResponse } from "@/lib/api-types";
+import { clearTokens, getTokens, setTokens } from "@/lib/auth-storage";
+import { getQueryClient } from "@/lib/query-client";
 import { field, toFormState, type FormState } from "@/lib/form-state";
-import { clearSession, getRefreshToken, setSession } from "@/lib/session";
 
 export async function loginAction(
   _previous: FormState,
@@ -13,7 +11,7 @@ export async function loginAction(
   const next = field(formData, "next") || "/";
 
   try {
-    const result = await api<AuthResponse>("/auth/login", {
+    const result = await apiClient<AuthResponse>("/auth/login", {
       method: "POST",
       anonymous: true,
       body: {
@@ -21,13 +19,13 @@ export async function loginAction(
         password: String(formData.get("password") ?? ""),
       },
     });
-    await setSession(result.tokens);
+    setTokens(result.tokens);
+    getQueryClient().clear();
   } catch (error) {
     return toFormState(error);
   }
 
-  // Outside the try block: redirect signals by throwing.
-  redirect(next);
+  return { ok: true, redirect: next };
 }
 
 export async function registerAction(
@@ -35,7 +33,7 @@ export async function registerAction(
   formData: FormData,
 ): Promise<FormState> {
   try {
-    const result = await api<AuthResponse>("/auth/register", {
+    const result = await apiClient<AuthResponse>("/auth/register", {
       method: "POST",
       anonymous: true,
       body: {
@@ -44,22 +42,21 @@ export async function registerAction(
         password: String(formData.get("password") ?? ""),
       },
     });
-    await setSession(result.tokens);
+    setTokens(result.tokens);
+    getQueryClient().clear();
   } catch (error) {
     return toFormState(error);
   }
 
-  redirect("/");
+  return { ok: true, redirect: "/" };
 }
 
 export async function logoutAction() {
-  const refreshToken = await getRefreshToken();
+  const refreshToken = getTokens()?.refreshToken;
 
   if (refreshToken) {
-    // Best effort: the cookies go regardless, so a failure here must not trap
-    // the user in a session they asked to end.
     try {
-      await api("/auth/logout", {
+      await apiClient("/auth/logout", {
         method: "POST",
         anonymous: true,
         body: { refreshToken },
@@ -69,6 +66,7 @@ export async function logoutAction() {
     }
   }
 
-  await clearSession();
-  redirect("/login");
+  clearTokens();
+  getQueryClient().clear();
+  window.location.assign("/login");
 }

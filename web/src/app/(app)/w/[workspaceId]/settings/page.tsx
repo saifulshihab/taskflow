@@ -1,23 +1,31 @@
+"use client";
+
+import { useParams } from "next/navigation";
 import { PageHeader } from "@/components/page-header";
-import { getWorkspace } from "@/lib/data";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useWorkspace } from "@/lib/queries";
 import { can } from "@/lib/rbac";
 import { DeleteWorkspaceDialog } from "./delete-workspace-dialog";
 import { WorkspaceSettingsForm } from "./settings-form";
 
-export default async function WorkspaceSettingsPage({
-  params,
-}: PageProps<"/w/[workspaceId]/settings">) {
-  const { workspaceId } = await params;
-  const workspace = await getWorkspace(workspaceId);
+export default function WorkspaceSettingsPage() {
+  const params = useParams();
+  const workspaceId = String(params.workspaceId);
+  const { data: workspace, isPending, isError } = useWorkspace(workspaceId);
+
+  if (isPending) return <Skeleton className="m-6 h-64 w-full" />;
+  if (isError || !workspace) {
+    return (
+      <p className="text-destructive p-6 text-sm">Could not load settings.</p>
+    );
+  }
+
   const canEdit = can(workspace.role, "ADMIN");
   const canDelete = can(workspace.role, "OWNER");
 
   return (
     <>
-      <PageHeader
-        title="Settings"
-        description={`Manage ${workspace.name}`}
-      />
+      <PageHeader title="Settings" description={`Manage ${workspace.name}`} />
 
       <div className="mx-auto max-w-lg space-y-8 p-4 md:p-6">
         {canEdit ? (

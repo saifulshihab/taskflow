@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useActionState, useEffect } from "react";
 import { FieldError, FormError, SubmitButton } from "@/components/form-feedback";
 import { NativeSelect } from "@/components/native-select";
@@ -36,6 +37,7 @@ export function TaskEditForm({
   deleteMode?: "redirect" | "close";
   onDeleted?: () => void;
 }) {
+  const router = useRouter();
   const [state, action] = useActionState<FormState, FormData>(
     updateTaskAction,
     {},
@@ -54,6 +56,10 @@ export function TaskEditForm({
       formData.set("skipRedirect", "true");
     }
     void deleteTaskAction(formData).then((result) => {
+      if (result.redirect) {
+        router.push(result.redirect);
+        return;
+      }
       if (result.ok && deleteMode === "close") onDeleted?.();
     });
   };

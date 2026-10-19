@@ -8,6 +8,8 @@ services:
     image: taskflow-api-dev
     env_file:
       - .env
+    environment:
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3100}
     ports:
       - "${PORT:-4000}:${PORT:-4000}"
     volumes:
@@ -23,9 +25,8 @@ services:
     build: ./web
     image: taskflow-web-dev
     environment:
-      # Container-to-container over the Compose network. Only the Next server
-      # talks to the API; the browser only ever talks to Next.
-      API_URL: http://api:4000/api
+      # Browser on the host calls the published API port directly.
+      NEXT_PUBLIC_API_URL: http://localhost:${PORT:-4000}/api
       NODE_ENV: development
       # Docker Desktop's filesystem does not deliver inotify events reliably,
       # so the dev server polls instead.

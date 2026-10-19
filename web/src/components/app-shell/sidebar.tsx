@@ -1,3 +1,5 @@
+"use client";
+
 import {
   ActivityIcon,
   FolderKanbanIcon,
@@ -7,7 +9,7 @@ import {
   UsersIcon,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getMe, getWorkspace, listWorkspaces } from "@/lib/data";
+import { useMe, useWorkspace, useWorkspaces } from "@/lib/queries";
 import { NavLink } from "./nav-link";
 import { UserMenu } from "./user-menu";
 import { WorkspaceSwitcher } from "./workspace-switcher";
@@ -24,16 +26,37 @@ function navItems(workspaceId: string) {
   ];
 }
 
-export async function SidebarContent({ workspaceId }: { workspaceId: string }) {
-  const [workspace, workspaces, me] = await Promise.all([
-    getWorkspace(workspaceId),
-    listWorkspaces({ pageSize: 100 }),
-    getMe(),
-  ]);
+export function SidebarContent({ workspaceId }: { workspaceId: string }) {
+  const workspaceQuery = useWorkspace(workspaceId);
+  const workspacesQuery = useWorkspaces({ pageSize: 100 });
+  const meQuery = useMe();
+
+  if (
+    workspaceQuery.isPending ||
+    workspacesQuery.isPending ||
+    meQuery.isPending
+  ) {
+    return <SidebarSkeleton />;
+  }
+
+  if (
+    workspaceQuery.isError ||
+    workspacesQuery.isError ||
+    meQuery.isError ||
+    !workspaceQuery.data ||
+    !meQuery.data
+  ) {
+    return (
+      <p className="text-destructive p-2 text-sm">Could not load navigation.</p>
+    );
+  }
 
   return (
     <div className="flex h-full flex-col gap-2 p-2">
-      <WorkspaceSwitcher current={workspace} workspaces={workspaces.data} />
+      <WorkspaceSwitcher
+        current={workspaceQuery.data}
+        workspaces={workspacesQuery.data?.data ?? []}
+      />
 
       <nav className="flex flex-1 flex-col gap-0.5">
         {navItems(workspaceId).map((item) => (
@@ -44,7 +67,7 @@ export async function SidebarContent({ workspaceId }: { workspaceId: string }) {
         ))}
       </nav>
 
-      <UserMenu user={me} />
+      <UserMenu user={meQuery.data} />
     </div>
   );
 }
@@ -58,7 +81,7 @@ export function SidebarSkeleton() {
           <Skeleton key={index} className="h-7 w-full" />
         ))}
       </div>
-      <Skeleton className="h-10 w-full" />
+      <Skeleton className="h-9 w-full" />
     </div>
   );
 }

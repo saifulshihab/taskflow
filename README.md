@@ -2,8 +2,9 @@
 
 Full-stack project and task management: workspaces, Kanban boards, labels,
 comments, and an activity feed. The **Express REST API** and **Next.js web app**
-share the same domain logic; the UI talks to the API through a BFF layer
-(httpOnly cookies, Server Actions). The backend is structured so the same
+share the same domain logic; the **web UI** is a client-rendered Next.js app
+that calls the REST API from the browser (TanStack Query, Bearer tokens in
+`localStorage`). The backend is structured so the same
 services can later be exposed through an MCP server without duplicating
 authorization or business rules.
 
@@ -68,19 +69,20 @@ a disposable database.
 
 ### Web on the host
 
-The Compose `web` service uses `API_URL=http://api:4000/api`. If you run the UI
-locally instead:
+The browser calls the API at `NEXT_PUBLIC_API_URL` (see `.env.example`). Compose
+sets this to `http://localhost:4000/api`. The API must allow your web origin via
+`CORS_ORIGIN` (default `http://localhost:3100`).
+
+If you run the UI locally instead of Compose:
 
 ```bash
-cd web && npm ci && API_URL=http://localhost:4000/api npm run dev
+cd web && npm ci && NEXT_PUBLIC_API_URL=http://localhost:4000/api npm run dev
 ```
 
-You still need the API running (`docker compose up -d api` is enough) and valid
-Prisma Postgres credentials in the API container's `.env`.
-
-Auth uses httpOnly cookies (BFF): `web/src/proxy.ts` refreshes access tokens
-before Server Components run, and Server Actions call the REST API via
-`web/src/lib/api.ts`.
+Auth: login/register store access and refresh tokens in `localStorage`
+(`web/src/lib/auth-storage.ts`). Requests use `Authorization: Bearer` via
+`web/src/lib/api-client.ts`, with automatic refresh on `401`. Route protection
+is client-side (`web/src/components/auth-guard.tsx`).
 
 ### Day-to-day commands
 

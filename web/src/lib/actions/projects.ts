@@ -1,9 +1,8 @@
-"use server";
-
-import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
-import { api } from "@/lib/api";
+import { apiClient } from "@/lib/api-client";
 import type { Project, ProjectStatus } from "@/lib/api-types";
+import { invalidateProjectViews } from "@/lib/invalidate";
+import { getQueryClient } from "@/lib/query-client";
+import { queryKeys } from "@/lib/query-keys";
 import {
   field,
   nullableField,
@@ -11,12 +10,6 @@ import {
   toFormState,
   type FormState,
 } from "@/lib/form-state";
-
-function revalidateProject(workspaceId: string, projectId: string) {
-  revalidatePath(`/w/${workspaceId}`);
-  revalidatePath(`/w/${workspaceId}/projects/${projectId}`);
-  revalidatePath(`/w/${workspaceId}/projects/${projectId}/list`);
-}
 
 export async function createProjectAction(
   _previous: FormState,
@@ -26,7 +19,7 @@ export async function createProjectAction(
   let project: Project;
 
   try {
-    project = await api<Project>(`/workspaces/${workspaceId}/projects`, {
+    project = await apiClient<Project>(`/workspaces/${workspaceId}/projects`, {
       method: "POST",
       body: {
         name: field(formData, "name"),
@@ -40,8 +33,10 @@ export async function createProjectAction(
     return toFormState(error);
   }
 
-  revalidatePath(`/w/${workspaceId}`);
-  redirect(`/w/${workspaceId}/projects/${project.id}`);
+  void getQueryClient().invalidateQueries({
+    queryKey: queryKeys.projects(workspaceId),
+  });
+  return { ok: true, redirect: `/w/${workspaceId}/projects/${project.id}` };
 }
 
 export async function updateProjectAction(
@@ -52,7 +47,7 @@ export async function updateProjectAction(
   const projectId = field(formData, "projectId");
 
   try {
-    await api(`/projects/${projectId}`, {
+    await apiClient(`/projects/${projectId}`, {
       method: "PATCH",
       body: {
         name: field(formData, "name"),
@@ -64,7 +59,7 @@ export async function updateProjectAction(
     return toFormState(error);
   }
 
-  revalidateProject(workspaceId, projectId);
+  invalidateProjectViews(getQueryClient(), workspaceId, projectId);
   return { ok: true };
 }
 
@@ -75,12 +70,14 @@ export async function archiveProjectAction(
   const projectId = field(formData, "projectId");
 
   try {
-    await api(`/projects/${projectId}/archive`, { method: "POST" });
+    await apiClient(`/projects/${projectId}/archive`, { method: "POST" });
   } catch (error) {
     return toFormState(error);
   }
 
-  revalidatePath(`/w/${workspaceId}`);
+  void getQueryClient().invalidateQueries({
+    queryKey: queryKeys.projects(workspaceId),
+  });
   return { ok: true };
 }
 
@@ -91,12 +88,12 @@ export async function unarchiveProjectAction(
   const projectId = field(formData, "projectId");
 
   try {
-    await api(`/projects/${projectId}/unarchive`, { method: "POST" });
+    await apiClient(`/projects/${projectId}/unarchive`, { method: "POST" });
   } catch (error) {
     return toFormState(error);
   }
 
-  revalidateProject(workspaceId, projectId);
+  invalidateProjectViews(getQueryClient(), workspaceId, projectId);
   return { ok: true };
 }
 
@@ -105,11 +102,13 @@ export async function deleteProjectAction(formData: FormData): Promise<FormState
   const projectId = field(formData, "projectId");
 
   try {
-    await api(`/projects/${projectId}`, { method: "DELETE" });
+    await apiClient(`/projects/${projectId}`, { method: "DELETE" });
   } catch (error) {
     return toFormState(error);
   }
 
-  revalidatePath(`/w/${workspaceId}`);
-  redirect(`/w/${workspaceId}`);
+  void getQueryClient().invalidateQueries({
+    queryKey: queryKeys.projects(workspaceId),
+  });
+  return { ok: true, redirect: `/w/${workspaceId}` };
 }

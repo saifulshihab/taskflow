@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
+import { useRouter } from "next/navigation";
+import { useActionState, useEffect } from "react";
 import { FieldError, FormError, SubmitButton } from "@/components/form-feedback";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,7 +9,12 @@ import { loginAction } from "@/lib/actions/auth";
 import type { FormState } from "@/lib/form-state";
 
 export function LoginForm({ next }: { next: string }) {
+  const router = useRouter();
   const [state, action] = useActionState<FormState, FormData>(loginAction, {});
+
+  useEffect(() => {
+    if (state.redirect) router.replace(state.redirect);
+  }, [state.redirect, router]);
 
   return (
     <form action={action} className="space-y-4">

@@ -1,8 +1,12 @@
+"use client";
+
+import { useParams } from "next/navigation";
 import { ActionDialog } from "@/components/dialog-form";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -12,19 +16,34 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { createLabelAction } from "@/lib/actions/labels";
-import { getWorkspace, listLabels } from "@/lib/data";
+import { useLabels, useWorkspace } from "@/lib/queries";
 import { can } from "@/lib/rbac";
 import { LabelRow } from "./label-row";
 
-export default async function LabelsPage({
-  params,
-}: PageProps<"/w/[workspaceId]/labels">) {
-  const { workspaceId } = await params;
-  const [workspace, labels] = await Promise.all([
-    getWorkspace(workspaceId),
-    listLabels(workspaceId),
-  ]);
+export default function LabelsPage() {
+  const params = useParams();
+  const workspaceId = String(params.workspaceId);
 
+  const workspaceQuery = useWorkspace(workspaceId);
+  const labelsQuery = useLabels(workspaceId);
+
+  if (workspaceQuery.isPending || labelsQuery.isPending) {
+    return <Skeleton className="m-6 h-64 w-full" />;
+  }
+
+  if (
+    workspaceQuery.isError ||
+    labelsQuery.isError ||
+    !workspaceQuery.data ||
+    !labelsQuery.data
+  ) {
+    return (
+      <p className="text-destructive p-6 text-sm">Could not load labels.</p>
+    );
+  }
+
+  const workspace = workspaceQuery.data;
+  const labels = labelsQuery.data;
   const canEdit = can(workspace.role, "MEMBER");
 
   return (

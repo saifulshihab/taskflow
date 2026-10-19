@@ -1,26 +1,49 @@
+"use client";
+
 import Link from "next/link";
+import { useParams } from "next/navigation";
 import { ProjectNav } from "@/components/projects/project-nav";
 import { PageHeader } from "@/components/page-header";
 import { TaskListFilters } from "@/components/tasks/task-list-filters";
 import { TaskTable } from "@/components/tasks/task-table";
 import { buttonVariants } from "@/components/ui/button";
-import { getProject, listProjectTasks, listProjects } from "@/lib/data";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useRawSearchParams } from "@/lib/search-params";
+import { useProject, useProjectTasks, useProjects } from "@/lib/queries";
 import { parseTaskListQuery, taskQueryToApi } from "@/lib/task-query";
 
-export default async function ProjectListPage({
-  params,
-  searchParams,
-}: PageProps<"/w/[workspaceId]/projects/[projectId]/list">) {
-  const { workspaceId, projectId } = await params;
-  const rawQuery = await searchParams;
+export default function ProjectListPage() {
+  const params = useParams();
+  const workspaceId = String(params.workspaceId);
+  const projectId = String(params.projectId);
+  const rawQuery = useRawSearchParams();
   const parsed = parseTaskListQuery(rawQuery);
   const query = { ...parsed, projectId };
 
-  const [project, projects, tasks] = await Promise.all([
-    getProject(projectId),
-    listProjects(workspaceId, { pageSize: 100 }),
-    listProjectTasks(projectId, taskQueryToApi(query)),
-  ]);
+  const projectQuery = useProject(projectId);
+  const projectsQuery = useProjects(workspaceId, { pageSize: 100 });
+  const tasksQuery = useProjectTasks(projectId, taskQueryToApi(query));
+
+  if (projectQuery.isPending || projectsQuery.isPending || tasksQuery.isPending) {
+    return <Skeleton className="m-6 h-64 w-full" />;
+  }
+
+  if (
+    projectQuery.isError ||
+    projectsQuery.isError ||
+    tasksQuery.isError ||
+    !projectQuery.data ||
+    !projectsQuery.data ||
+    !tasksQuery.data
+  ) {
+    return (
+      <p className="text-destructive p-6 text-sm">Could not load task list.</p>
+    );
+  }
+
+  const project = projectQuery.data;
+  const projects = projectsQuery.data;
+  const tasks = tasksQuery.data;
 
   return (
     <>

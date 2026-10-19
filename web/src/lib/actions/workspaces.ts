@@ -1,9 +1,8 @@
-"use server";
-
-import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
-import { api } from "@/lib/api";
+import { apiClient } from "@/lib/api-client";
 import type { Role, Workspace } from "@/lib/api-types";
+import { invalidateWorkspaceShell } from "@/lib/invalidate";
+import { getQueryClient } from "@/lib/query-client";
+import { queryKeys } from "@/lib/query-keys";
 import {
   field,
   optionalField,
@@ -18,7 +17,7 @@ export async function createWorkspaceAction(
   let workspace: Workspace;
 
   try {
-    workspace = await api<Workspace>("/workspaces", {
+    workspace = await apiClient<Workspace>("/workspaces", {
       method: "POST",
       body: {
         name: field(formData, "name"),
@@ -29,8 +28,8 @@ export async function createWorkspaceAction(
     return toFormState(error);
   }
 
-  revalidatePath("/workspaces");
-  redirect(`/w/${workspace.id}`);
+  void getQueryClient().invalidateQueries({ queryKey: queryKeys.workspaces() });
+  return { ok: true, redirect: `/w/${workspace.id}` };
 }
 
 export async function updateWorkspaceAction(
@@ -40,7 +39,7 @@ export async function updateWorkspaceAction(
   const workspaceId = field(formData, "workspaceId");
 
   try {
-    await api(`/workspaces/${workspaceId}`, {
+    await apiClient(`/workspaces/${workspaceId}`, {
       method: "PATCH",
       body: { name: field(formData, "name") },
     });
@@ -48,8 +47,7 @@ export async function updateWorkspaceAction(
     return toFormState(error);
   }
 
-  revalidatePath("/workspaces");
-  revalidatePath(`/w/${workspaceId}`, "layout");
+  invalidateWorkspaceShell(getQueryClient(), workspaceId);
   return { ok: true };
 }
 
@@ -60,18 +58,18 @@ export async function deleteWorkspaceAction(
   const workspaceId = field(formData, "workspaceId");
 
   try {
-    const workspace = await api<Workspace>(`/workspaces/${workspaceId}`);
+    const workspace = await apiClient<Workspace>(`/workspaces/${workspaceId}`);
     if (field(formData, "confirmation") !== workspace.name) {
       return { error: `Type ${workspace.name} to confirm deletion.` };
     }
 
-    await api(`/workspaces/${workspaceId}`, { method: "DELETE" });
+    await apiClient(`/workspaces/${workspaceId}`, { method: "DELETE" });
   } catch (error) {
     return toFormState(error);
   }
 
-  revalidatePath("/workspaces");
-  redirect("/workspaces");
+  void getQueryClient().invalidateQueries({ queryKey: queryKeys.workspaces() });
+  return { ok: true, redirect: "/workspaces" };
 }
 
 export async function addMemberAction(
@@ -81,7 +79,7 @@ export async function addMemberAction(
   const workspaceId = field(formData, "workspaceId");
 
   try {
-    await api(`/workspaces/${workspaceId}/members`, {
+    await apiClient(`/workspaces/${workspaceId}/members`, {
       method: "POST",
       body: {
         email: field(formData, "email"),
@@ -92,7 +90,9 @@ export async function addMemberAction(
     return toFormState(error);
   }
 
-  revalidatePath(`/w/${workspaceId}/members`);
+  void getQueryClient().invalidateQueries({
+    queryKey: queryKeys.members(workspaceId),
+  });
   return { ok: true };
 }
 
@@ -103,7 +103,7 @@ export async function updateMemberRoleAction(
   const userId = field(formData, "userId");
 
   try {
-    await api(`/workspaces/${workspaceId}/members/${userId}`, {
+    await apiClient(`/workspaces/${workspaceId}/members/${userId}`, {
       method: "PATCH",
       body: { role: field(formData, "role") as Role },
     });
@@ -111,7 +111,9 @@ export async function updateMemberRoleAction(
     return toFormState(error);
   }
 
-  revalidatePath(`/w/${workspaceId}/members`);
+  void getQueryClient().invalidateQueries({
+    queryKey: queryKeys.members(workspaceId),
+  });
   return { ok: true };
 }
 
@@ -122,13 +124,15 @@ export async function removeMemberAction(
   const userId = field(formData, "userId");
 
   try {
-    await api(`/workspaces/${workspaceId}/members/${userId}`, {
+    await apiClient(`/workspaces/${workspaceId}/members/${userId}`, {
       method: "DELETE",
     });
   } catch (error) {
     return toFormState(error);
   }
 
-  revalidatePath(`/w/${workspaceId}/members`);
+  void getQueryClient().invalidateQueries({
+    queryKey: queryKeys.members(workspaceId),
+  });
   return { ok: true };
 }

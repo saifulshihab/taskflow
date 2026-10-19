@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { TaskDetailPanels } from "@/components/tasks/task-detail-panels";
 import { buttonVariants } from "@/components/ui/button";
 import {
@@ -13,10 +13,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  fetchTaskDetailContext,
-  type TaskDetailContext,
-} from "@/lib/actions/task-detail";
+import { queryKeys } from "@/lib/query-keys";
+import { useTaskDetailContext } from "@/lib/queries";
 
 export function TaskDetailDialog({
   taskId,
@@ -31,58 +29,45 @@ export function TaskDetailDialog({
   onOpenChange: (open: boolean) => void;
   previewTitle?: string;
 }) {
-  const router = useRouter();
+  const queryClient = useQueryClient();
   const [selection, setSelection] = useState<{
     rootTaskId: string;
     selectedTaskId: string;
   } | null>(null);
   const activeTaskId =
     selection?.rootTaskId === taskId ? selection.selectedTaskId : taskId;
-  const [detail, setDetail] = useState<{
-    taskId: string;
-    context: TaskDetailContext | null;
-    error: string | null;
-  } | null>(null);
-  const context = detail?.taskId === activeTaskId ? detail.context : null;
-  const error = detail?.taskId === activeTaskId ? detail.error : null;
-  const [loading, startLoad] = useTransition();
 
-  const load = useCallback(
-    (id: string) => {
-      startLoad(async () => {
-        const result = await fetchTaskDetailContext(workspaceId, id);
-        if ("error" in result) {
-          setDetail({ taskId: id, context: null, error: result.error });
-          return;
-        }
-        setDetail({ taskId: id, context: result, error: null });
-      });
-    },
-    [workspaceId],
+  const { data: context, isPending, isError, error } = useTaskDetailContext(
+    workspaceId,
+    open && activeTaskId ? activeTaskId : null,
   );
 
   useEffect(() => {
-    if (open && activeTaskId) load(activeTaskId);
-  }, [open, activeTaskId, load]);
+    if (!open) {
+      setSelection(null);
+    }
+  }, [open]);
 
   const handleOpenChange = (nextOpen: boolean) => {
-    if (!nextOpen) {
-      setSelection(null);
-      setDetail(null);
-    }
+    if (!nextOpen) setSelection(null);
     onOpenChange(nextOpen);
   };
 
-  const refresh = useCallback(() => {
-    router.refresh();
-    if (activeTaskId) load(activeTaskId);
-  }, [activeTaskId, load, router]);
+  const refresh = () => {
+    if (!activeTaskId) return;
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.taskDetail(workspaceId, activeTaskId),
+    });
+  };
 
   const detailHref =
     activeTaskId != null ? `/w/${workspaceId}/tasks/${activeTaskId}` : "#";
 
   const title =
-    context?.task.title ?? previewTitle ?? (loading ? "Loading…" : "Task");
+    context?.task.title ?? previewTitle ?? (isPending ? "Loading…" : "Task");
+
+  const errorMessage =
+    isError && error instanceof Error ? error.message : isError ? "Task not found" : null;
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -117,7 +102,7 @@ export function TaskDetailDialog({
         </DialogHeader>
 
         <div className="min-h-0 flex-1 overflow-y-auto p-4 md:p-6">
-          {loading && !context && (
+          {isPending && !context && (
             <div className="space-y-4">
               <Skeleton className="h-48 w-full" />
               <Skeleton className="h-32 w-full" />
@@ -125,8 +110,8 @@ export function TaskDetailDialog({
             </div>
           )}
 
-          {error && (
-            <p className="text-destructive text-sm">{error}</p>
+          {errorMessage && (
+            <p className="text-destructive text-sm">{errorMessage}</p>
           )}
 
           {context && activeTaskId && (

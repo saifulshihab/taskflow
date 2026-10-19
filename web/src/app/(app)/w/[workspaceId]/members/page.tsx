@@ -1,9 +1,13 @@
+"use client";
+
+import { useParams } from "next/navigation";
 import { ActionDialog } from "@/components/dialog-form";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/native-select";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -14,21 +18,39 @@ import {
 } from "@/components/ui/table";
 import { addMemberAction } from "@/lib/actions/workspaces";
 import { ROLES } from "@/lib/api-types";
-import { getMe, getWorkspace, listMembers } from "@/lib/data";
 import { ROLE_LABELS } from "@/lib/format";
+import { useMe, useMembers, useWorkspace } from "@/lib/queries";
 import { can } from "@/lib/rbac";
 import { MemberRowActions } from "./member-row";
 
-export default async function MembersPage({
-  params,
-}: PageProps<"/w/[workspaceId]/members">) {
-  const { workspaceId } = await params;
-  const [workspace, members, me] = await Promise.all([
-    getWorkspace(workspaceId),
-    listMembers(workspaceId),
-    getMe(),
-  ]);
+export default function MembersPage() {
+  const params = useParams();
+  const workspaceId = String(params.workspaceId);
 
+  const workspaceQuery = useWorkspace(workspaceId);
+  const membersQuery = useMembers(workspaceId);
+  const meQuery = useMe();
+
+  if (workspaceQuery.isPending || membersQuery.isPending || meQuery.isPending) {
+    return <Skeleton className="m-6 h-64 w-full" />;
+  }
+
+  if (
+    workspaceQuery.isError ||
+    membersQuery.isError ||
+    meQuery.isError ||
+    !workspaceQuery.data ||
+    !membersQuery.data ||
+    !meQuery.data
+  ) {
+    return (
+      <p className="text-destructive p-6 text-sm">Could not load members.</p>
+    );
+  }
+
+  const workspace = workspaceQuery.data;
+  const members = membersQuery.data;
+  const me = meQuery.data;
   const canManage = can(workspace.role, "ADMIN");
 
   return (

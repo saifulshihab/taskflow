@@ -11,7 +11,16 @@ export const createApp = () => {
   const app = express();
 
   app.use(helmet());
-  app.use(cors());
+  const corsOrigins = (process.env.CORS_ORIGIN ?? "http://localhost:3100")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  app.use(
+    cors({
+      origin: corsOrigins,
+      allowedHeaders: ["Content-Type", "Authorization"],
+    }),
+  );
   app.use(express.json({ limit: "1mb" }));
   app.use(pinoHttp({ logger }));
 

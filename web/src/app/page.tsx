@@ -1,15 +1,26 @@
-import { redirect } from "next/navigation";
-import { api } from "@/lib/api";
-import type { Paginated, Workspace } from "@/lib/api-types";
+"use client";
 
-export const instant = false;
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
+import { useWorkspaces } from "@/lib/queries";
 
-// Entry point: land people in a workspace rather than on an empty shell.
-export default async function HomePage() {
-  const workspaces = await api<Paginated<Workspace>>("/workspaces", {
-    query: { pageSize: 1 },
-  });
+export default function HomePage() {
+  const router = useRouter();
+  const { data, isPending, isError } = useWorkspaces({ pageSize: 1 });
 
-  const first = workspaces.data[0];
-  redirect(first ? `/w/${first.id}` : "/workspaces");
+  useEffect(() => {
+    if (isPending) return;
+    if (isError) {
+      router.replace("/workspaces");
+      return;
+    }
+    const first = data?.data[0];
+    router.replace(first ? `/w/${first.id}` : "/workspaces");
+  }, [data, isError, isPending, router]);
+
+  return (
+    <div className="text-muted-foreground flex min-h-svh items-center justify-center text-sm">
+      Loading…
+    </div>
+  );
 }

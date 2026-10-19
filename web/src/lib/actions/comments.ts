@@ -1,18 +1,16 @@
-"use server";
-
-import { revalidatePath } from "next/cache";
-import { api } from "@/lib/api";
+import { apiClient } from "@/lib/api-client";
+import { getQueryClient } from "@/lib/query-client";
+import { queryKeys } from "@/lib/query-keys";
 import { field, toFormState, type FormState } from "@/lib/form-state";
 
 export async function createCommentAction(
   _previous: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  const workspaceId = field(formData, "workspaceId");
   const taskId = field(formData, "taskId");
 
   try {
-    await api(`/tasks/${taskId}/comments`, {
+    await apiClient(`/tasks/${taskId}/comments`, {
       method: "POST",
       body: { body: field(formData, "body") },
     });
@@ -20,7 +18,12 @@ export async function createCommentAction(
     return toFormState(error);
   }
 
-  revalidatePath(`/w/${workspaceId}/tasks/${taskId}`);
+  void getQueryClient().invalidateQueries({
+    queryKey: queryKeys.comments(taskId),
+  });
+  void getQueryClient().invalidateQueries({
+    queryKey: queryKeys.taskDetail(field(formData, "workspaceId"), taskId),
+  });
   return { ok: true };
 }
 
@@ -33,7 +36,7 @@ export async function updateCommentAction(
   const commentId = field(formData, "commentId");
 
   try {
-    await api(`/comments/${commentId}`, {
+    await apiClient(`/comments/${commentId}`, {
       method: "PATCH",
       body: { body: field(formData, "body") },
     });
@@ -41,7 +44,12 @@ export async function updateCommentAction(
     return toFormState(error);
   }
 
-  revalidatePath(`/w/${workspaceId}/tasks/${taskId}`);
+  void getQueryClient().invalidateQueries({
+    queryKey: queryKeys.comments(taskId),
+  });
+  void getQueryClient().invalidateQueries({
+    queryKey: queryKeys.taskDetail(workspaceId, taskId),
+  });
   return { ok: true };
 }
 
@@ -53,11 +61,16 @@ export async function deleteCommentAction(
   const commentId = field(formData, "commentId");
 
   try {
-    await api(`/comments/${commentId}`, { method: "DELETE" });
+    await apiClient(`/comments/${commentId}`, { method: "DELETE" });
   } catch (error) {
     return toFormState(error);
   }
 
-  revalidatePath(`/w/${workspaceId}/tasks/${taskId}`);
+  void getQueryClient().invalidateQueries({
+    queryKey: queryKeys.comments(taskId),
+  });
+  void getQueryClient().invalidateQueries({
+    queryKey: queryKeys.taskDetail(workspaceId, taskId),
+  });
   return { ok: true };
 }

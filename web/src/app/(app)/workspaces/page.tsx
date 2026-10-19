@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import { PlusIcon } from "lucide-react";
 import { ActionDialog } from "@/components/dialog-form";
@@ -5,14 +7,12 @@ import { EmptyState, PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import { createWorkspaceAction } from "@/lib/actions/workspaces";
-import { listWorkspaces } from "@/lib/data";
+import { useWorkspaces } from "@/lib/queries";
 
-export const instant = false;
-export const metadata = { title: "Workspaces | TaskFlow" };
-
-export default async function WorkspacesPage() {
-  const workspaces = await listWorkspaces({ pageSize: 100 });
+export default function WorkspacesPage() {
+  const { data, isPending, isError } = useWorkspaces({ pageSize: 100 });
 
   return (
     <div className="mx-auto flex min-h-svh max-w-3xl flex-col">
@@ -21,7 +21,11 @@ export default async function WorkspacesPage() {
         description="Switch between teams or spin up a new one."
       >
         <ActionDialog
-          trigger={<Button size="sm"><PlusIcon /> New workspace</Button>}
+          trigger={
+            <Button size="sm">
+              <PlusIcon /> New workspace
+            </Button>
+          }
           title="Create workspace"
           description="You will be the owner."
           action={createWorkspaceAction}
@@ -40,14 +44,19 @@ export default async function WorkspacesPage() {
       </PageHeader>
 
       <div className="flex-1 space-y-3 p-4 md:p-6">
-        {workspaces.data.length === 0 ? (
+        {isPending && <Skeleton className="h-48 w-full rounded-xl" />}
+        {isError && (
+          <p className="text-destructive text-sm">Could not load workspaces.</p>
+        )}
+        {data && data.data.length === 0 && (
           <EmptyState
             title="No workspaces yet"
             description="Create your first workspace to start tracking projects."
           />
-        ) : (
+        )}
+        {data && data.data.length > 0 && (
           <ul className="divide-y rounded-xl border">
-            {workspaces.data.map((workspace) => (
+            {data.data.map((workspace) => (
               <li key={workspace.id}>
                 <Link
                   href={`/w/${workspace.id}`}

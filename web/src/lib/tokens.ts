@@ -1,5 +1,4 @@
-// Shared by proxy.ts and the server-only session module, so it must not import
-// next/headers or anything marked server-only.
+// Legacy cookie names; auth uses localStorage (see auth-storage.ts).
 
 export const ACCESS_COOKIE = "tf_access";
 export const REFRESH_COOKIE = "tf_refresh";

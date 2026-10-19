@@ -1,12 +1,17 @@
+"use client";
+
 import Link from "next/link";
+import { useParams } from "next/navigation";
 import { PageHeader } from "@/components/page-header";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/native-select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { describeActivity, activityEntityLabel } from "@/lib/activity-text";
-import { listActivity, listMembers } from "@/lib/data";
 import { fromNow } from "@/lib/format";
+import { useRawSearchParams } from "@/lib/search-params";
+import { useActivity, useMembers } from "@/lib/queries";
 
 const ENTITY_TYPES = [
   "workspace",
@@ -16,12 +21,10 @@ const ENTITY_TYPES = [
   "comment",
 ] as const;
 
-export default async function ActivityPage({
-  params,
-  searchParams,
-}: PageProps<"/w/[workspaceId]/activity">) {
-  const { workspaceId } = await params;
-  const query = await searchParams;
+export default function ActivityPage() {
+  const params = useParams();
+  const workspaceId = String(params.workspaceId);
+  const query = useRawSearchParams();
 
   const entityType =
     typeof query.entityType === "string" ? query.entityType : undefined;
@@ -29,21 +32,39 @@ export default async function ActivityPage({
     typeof query.action === "string" ? query.action : undefined;
   const actorId =
     typeof query.actorId === "string" ? query.actorId : undefined;
-  const since =
-    typeof query.since === "string" ? query.since : undefined;
-  const page = query.page ? Number(query.page) : 1;
+  const since = typeof query.since === "string" ? query.since : undefined;
+  const pageRaw = query.page;
+  const page = pageRaw
+    ? Number(Array.isArray(pageRaw) ? pageRaw[0] : pageRaw)
+    : 1;
 
-  const [events, members] = await Promise.all([
-    listActivity(workspaceId, {
-      page,
-      pageSize: 30,
-      entityType,
-      action,
-      actorId,
-      since,
-    }),
-    listMembers(workspaceId),
-  ]);
+  const eventsQuery = useActivity(workspaceId, {
+    page,
+    pageSize: 30,
+    entityType,
+    action,
+    actorId,
+    since,
+  });
+  const membersQuery = useMembers(workspaceId);
+
+  if (eventsQuery.isPending || membersQuery.isPending) {
+    return <Skeleton className="m-6 h-64 w-full" />;
+  }
+
+  if (
+    eventsQuery.isError ||
+    membersQuery.isError ||
+    !eventsQuery.data ||
+    !membersQuery.data
+  ) {
+    return (
+      <p className="text-destructive p-6 text-sm">Could not load activity.</p>
+    );
+  }
+
+  const events = eventsQuery.data;
+  const members = membersQuery.data;
 
   return (
     <>
@@ -53,7 +74,10 @@ export default async function ActivityPage({
       />
 
       <div className="space-y-4 p-4 md:p-6">
-        <form method="get" className="grid gap-3 rounded-xl border p-4 sm:grid-cols-2 lg:grid-cols-4">
+        <form
+          method="get"
+          className="grid gap-3 rounded-xl border p-4 sm:grid-cols-2 lg:grid-cols-4"
+        >
           <div className="space-y-1.5">
             <Label htmlFor="entityType">Entity</Label>
             <NativeSelect
@@ -99,7 +123,9 @@ export default async function ActivityPage({
             />
           </div>
           <div className="flex items-end sm:col-span-2 lg:col-span-4">
-            <Button type="submit" size="sm">Apply filters</Button>
+            <Button type="submit" size="sm">
+              Apply filters
+            </Button>
           </div>
         </form>
 

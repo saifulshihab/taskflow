@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useActionState, useEffect } from "react";
 import { FieldError, FormError, SubmitButton } from "@/components/form-feedback";
 import {
@@ -35,14 +36,19 @@ export function ActionDialog({
   onOpenChange?: (open: boolean) => void;
   onSuccess?: () => void;
 }) {
+  const router = useRouter();
   const [state, formAction] = useActionState(action, {});
 
   useEffect(() => {
+    if (state.redirect) {
+      router.push(state.redirect);
+      return;
+    }
     if (state.ok) {
       onOpenChange?.(false);
       onSuccess?.();
     }
-  }, [state.ok, onOpenChange, onSuccess]);
+  }, [state.ok, state.redirect, onOpenChange, onSuccess, router]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

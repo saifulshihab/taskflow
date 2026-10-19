@@ -1,9 +1,10 @@
-"use server";
-
-import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
-import { api } from "@/lib/api";
+import { apiClient } from "@/lib/api-client";
 import type { Priority, Task, TaskStatus } from "@/lib/api-types";
+import {
+  invalidateProjectViews,
+  invalidateTaskViews,
+} from "@/lib/invalidate";
+import { getQueryClient } from "@/lib/query-client";
 import {
   field,
   nullableField,
@@ -11,14 +12,6 @@ import {
   toFormState,
   type FormState,
 } from "@/lib/form-state";
-
-function revalidateTaskPaths(workspaceId: string, projectId?: string) {
-  revalidatePath(`/w/${workspaceId}/tasks`);
-  if (projectId) {
-    revalidatePath(`/w/${workspaceId}/projects/${projectId}`);
-    revalidatePath(`/w/${workspaceId}/projects/${projectId}/list`);
-  }
-}
 
 export async function createTaskAction(
   _previous: FormState,
@@ -29,7 +22,7 @@ export async function createTaskAction(
   let task: Task;
 
   try {
-    task = await api<Task>(`/projects/${projectId}/tasks`, {
+    task = await apiClient<Task>(`/projects/${projectId}/tasks`, {
       method: "POST",
       body: {
         title: field(formData, "title"),
@@ -46,9 +39,10 @@ export async function createTaskAction(
     return toFormState(error);
   }
 
-  revalidateTaskPaths(workspaceId, projectId);
+  const qc = getQueryClient();
+  invalidateProjectViews(qc, workspaceId, projectId);
   if (field(formData, "redirect") === "detail") {
-    redirect(`/w/${workspaceId}/tasks/${task.id}`);
+    return { ok: true, redirect: `/w/${workspaceId}/tasks/${task.id}` };
   }
   return { ok: true };
 }
@@ -62,7 +56,7 @@ export async function updateTaskAction(
   const taskId = field(formData, "taskId");
 
   try {
-    await api(`/tasks/${taskId}`, {
+    await apiClient(`/tasks/${taskId}`, {
       method: "PATCH",
       body: {
         title: field(formData, "title"),
@@ -77,8 +71,7 @@ export async function updateTaskAction(
     return toFormState(error);
   }
 
-  revalidateTaskPaths(workspaceId, projectId);
-  revalidatePath(`/w/${workspaceId}/tasks/${taskId}`);
+  invalidateTaskViews(getQueryClient(), workspaceId, projectId, taskId);
   return { ok: true };
 }
 
@@ -88,23 +81,27 @@ export async function deleteTaskAction(formData: FormData): Promise<FormState> {
   const taskId = field(formData, "taskId");
 
   try {
-    await api(`/tasks/${taskId}`, { method: "DELETE" });
+    await apiClient(`/tasks/${taskId}`, { method: "DELETE" });
   } catch (error) {
     return toFormState(error);
   }
 
-  revalidateTaskPaths(workspaceId, projectId);
-  revalidatePath(`/w/${workspaceId}/tasks/${taskId}`);
+  const qc = getQueryClient();
+  if (projectId) {
+    invalidateProjectViews(qc, workspaceId, projectId);
+  }
+  void qc.invalidateQueries({ queryKey: ["workspaceTasks", workspaceId] });
 
   if (field(formData, "skipRedirect") === "true") {
     return { ok: true };
   }
 
-  redirect(
-    projectId
+  return {
+    ok: true,
+    redirect: projectId
       ? `/w/${workspaceId}/projects/${projectId}`
       : `/w/${workspaceId}/tasks`,
-  );
+  };
 }
 
 export async function setTaskStatusAction(
@@ -114,11 +111,11 @@ export async function setTaskStatusAction(
   projectId: string,
 ): Promise<{ ok: true; task: Task } | { ok: false; error: string }> {
   try {
-    const task = await api<Task>(`/tasks/${taskId}/status`, {
+    const task = await apiClient<Task>(`/tasks/${taskId}/status`, {
       method: "PATCH",
       body: { status },
     });
-    revalidateTaskPaths(workspaceId, projectId);
+    invalidateProjectViews(getQueryClient(), workspaceId, projectId);
     return { ok: true, task };
   } catch (error) {
     return {
@@ -137,7 +134,7 @@ export async function setTaskAssigneeAction(
   const assigneeRaw = field(formData, "assigneeId");
 
   try {
-    await api(`/tasks/${taskId}/assignee`, {
+    await apiClient(`/tasks/${taskId}/assignee`, {
       method: "PATCH",
       body: {
         assigneeId: assigneeRaw === "" ? null : assigneeRaw,
@@ -147,8 +144,7 @@ export async function setTaskAssigneeAction(
     return toFormState(error);
   }
 
-  revalidateTaskPaths(workspaceId, projectId);
-  revalidatePath(`/w/${workspaceId}/tasks/${taskId}`);
+  invalidateTaskViews(getQueryClient(), workspaceId, projectId, taskId);
   return { ok: true };
 }
 
@@ -158,7 +154,7 @@ export async function attachLabelAction(formData: FormData): Promise<FormState> 
   const taskId = field(formData, "taskId");
 
   try {
-    await api(`/tasks/${taskId}/labels`, {
+    await apiClient(`/tasks/${taskId}/labels`, {
       method: "POST",
       body: { labelId: field(formData, "labelId") },
     });
@@ -166,8 +162,7 @@ export async function attachLabelAction(formData: FormData): Promise<FormState> 
     return toFormState(error);
   }
 
-  revalidateTaskPaths(workspaceId, projectId);
-  revalidatePath(`/w/${workspaceId}/tasks/${taskId}`);
+  invalidateTaskViews(getQueryClient(), workspaceId, projectId, taskId);
   return { ok: true };
 }
 
@@ -178,12 +173,11 @@ export async function detachLabelAction(formData: FormData): Promise<FormState> 
   const labelId = field(formData, "labelId");
 
   try {
-    await api(`/tasks/${taskId}/labels/${labelId}`, { method: "DELETE" });
+    await apiClient(`/tasks/${taskId}/labels/${labelId}`, { method: "DELETE" });
   } catch (error) {
     return toFormState(error);
   }
 
-  revalidateTaskPaths(workspaceId, projectId);
-  revalidatePath(`/w/${workspaceId}/tasks/${taskId}`);
+  invalidateTaskViews(getQueryClient(), workspaceId, projectId, taskId);
   return { ok: true };
 }

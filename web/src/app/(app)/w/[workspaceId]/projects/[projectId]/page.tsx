@@ -1,4 +1,6 @@
-import { Suspense } from "react";
+"use client";
+
+import { useParams } from "next/navigation";
 import { ActionDialog } from "@/components/dialog-form";
 import { ProjectActions } from "@/components/projects/project-actions";
 import { ProjectNav } from "@/components/projects/project-nav";
@@ -9,23 +11,45 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { createTaskAction } from "@/lib/actions/tasks";
-import { getProject, getWorkspace, listProjectTasks } from "@/lib/data";
+import { useProject, useProjectTasks, useWorkspace } from "@/lib/queries";
 import { can } from "@/lib/rbac";
 
-export default async function ProjectBoardPage({
-  params,
-}: PageProps<"/w/[workspaceId]/projects/[projectId]">) {
-  const { workspaceId, projectId } = await params;
-  const [project, workspace, tasks] = await Promise.all([
-    getProject(projectId),
-    getWorkspace(workspaceId),
-    listProjectTasks(projectId, {
-      pageSize: 100,
-      topLevelOnly: true,
-      sort: "position",
-    }),
-  ]);
+export default function ProjectBoardPage() {
+  const params = useParams();
+  const workspaceId = String(params.workspaceId);
+  const projectId = String(params.projectId);
 
+  const projectQuery = useProject(projectId);
+  const workspaceQuery = useWorkspace(workspaceId);
+  const tasksQuery = useProjectTasks(projectId, {
+    pageSize: 100,
+    topLevelOnly: true,
+    sort: "position",
+  });
+
+  if (
+    projectQuery.isPending ||
+    workspaceQuery.isPending ||
+    tasksQuery.isPending
+  ) {
+    return <Skeleton className="m-6 h-64 w-full" />;
+  }
+
+  if (
+    projectQuery.isError ||
+    workspaceQuery.isError ||
+    tasksQuery.isError ||
+    !projectQuery.data ||
+    !workspaceQuery.data ||
+    !tasksQuery.data
+  ) {
+    return (
+      <p className="text-destructive p-6 text-sm">Could not load project board.</p>
+    );
+  }
+
+  const project = projectQuery.data;
+  const workspace = workspaceQuery.data;
   const canEdit = can(workspace.role, "MEMBER");
   const canManage = can(workspace.role, "ADMIN");
 
@@ -59,13 +83,11 @@ export default async function ProjectBoardPage({
       </PageHeader>
 
       <div className="flex flex-1 flex-col p-4 md:p-6">
-        <Suspense fallback={<Skeleton className="h-64 w-full" />}>
-          <TaskBoard
-            tasks={tasks.data}
-            workspaceId={workspaceId}
-            projectId={projectId}
-          />
-        </Suspense>
+        <TaskBoard
+          tasks={tasksQuery.data.data}
+          workspaceId={workspaceId}
+          projectId={projectId}
+        />
       </div>
     </div>
   );

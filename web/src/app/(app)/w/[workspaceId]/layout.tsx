@@ -1,22 +1,14 @@
-import { Suspense } from "react";
+"use client";
+
 import { MobileNav } from "@/components/app-shell/mobile-nav";
-import { SidebarContent, SidebarSkeleton } from "@/components/app-shell/sidebar";
+import { SidebarContent } from "@/components/app-shell/sidebar";
+import { useParams } from "next/navigation";
 
-export const instant = false;
+export default function WorkspaceLayout({ children }: { children: React.ReactNode }) {
+  const params = useParams();
+  const workspaceId = String(params.workspaceId);
 
-export default async function WorkspaceLayout({
-  children,
-  params,
-}: LayoutProps<"/w/[workspaceId]">) {
-  const { workspaceId } = await params;
-
-  // The sidebar reads cookies, so it stays behind Suspense to keep the rest of
-  // the shell prerenderable.
-  const sidebar = (
-    <Suspense fallback={<SidebarSkeleton />}>
-      <SidebarContent workspaceId={workspaceId} />
-    </Suspense>
-  );
+  const sidebar = <SidebarContent workspaceId={workspaceId} />;
 
   return (
     <div className="flex min-h-svh">

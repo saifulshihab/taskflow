@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
 import { Geist_Mono, Inter } from "next/font/google";
+import { Suspense } from "react";
+import { AuthGuard } from "@/components/auth-guard";
+import { Providers } from "@/components/providers";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
@@ -25,7 +28,17 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${inter.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        {children}
+        <Providers>
+          <Suspense
+            fallback={
+              <div className="text-muted-foreground flex min-h-svh items-center justify-center text-sm">
+                Loading…
+              </div>
+            }
+          >
+            <AuthGuard>{children}</AuthGuard>
+          </Suspense>
+        </Providers>
         <Toaster richColors position="top-right" />
       </body>
     </html>

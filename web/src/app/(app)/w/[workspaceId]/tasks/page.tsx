@@ -1,25 +1,50 @@
+"use client";
+
 import Link from "next/link";
+import { useParams } from "next/navigation";
 import { PageHeader } from "@/components/page-header";
 import { TaskListFilters } from "@/components/tasks/task-list-filters";
 import { TaskTable } from "@/components/tasks/task-table";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { NativeSelect } from "@/components/native-select";
-import { listLabels, listProjects, listWorkspaceTasks } from "@/lib/data";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useRawSearchParams } from "@/lib/search-params";
+import { useLabels, useProjects, useWorkspaceTasks } from "@/lib/queries";
 import { parseTaskListQuery, taskQueryToApi } from "@/lib/task-query";
 
-export default async function WorkspaceTasksPage({
-  params,
-  searchParams,
-}: PageProps<"/w/[workspaceId]/tasks">) {
-  const { workspaceId } = await params;
-  const rawQuery = await searchParams;
+export default function WorkspaceTasksPage() {
+  const params = useParams();
+  const workspaceId = String(params.workspaceId);
+  const rawQuery = useRawSearchParams();
   const query = parseTaskListQuery(rawQuery);
 
-  const [projects, tasks, labels] = await Promise.all([
-    listProjects(workspaceId, { pageSize: 100 }),
-    listWorkspaceTasks(workspaceId, taskQueryToApi(query)),
-    listLabels(workspaceId),
-  ]);
+  const projectsQuery = useProjects(workspaceId, { pageSize: 100 });
+  const tasksQuery = useWorkspaceTasks(
+    workspaceId,
+    taskQueryToApi(query),
+  );
+  const labelsQuery = useLabels(workspaceId);
+
+  if (projectsQuery.isPending || tasksQuery.isPending || labelsQuery.isPending) {
+    return <Skeleton className="m-6 h-64 w-full" />;
+  }
+
+  if (
+    projectsQuery.isError ||
+    tasksQuery.isError ||
+    labelsQuery.isError ||
+    !projectsQuery.data ||
+    !tasksQuery.data ||
+    !labelsQuery.data
+  ) {
+    return (
+      <p className="text-destructive p-6 text-sm">Could not load tasks.</p>
+    );
+  }
+
+  const projects = projectsQuery.data;
+  const tasks = tasksQuery.data;
+  const labels = labelsQuery.data;
 
   return (
     <>
@@ -58,7 +83,9 @@ export default async function WorkspaceTasksPage({
                 ))}
               </NativeSelect>
             </label>
-            <Button type="submit" variant="secondary">Apply label</Button>
+            <Button type="submit" variant="secondary">
+              Apply label
+            </Button>
           </form>
         )}
         <TaskTable tasks={tasks.data} workspaceId={workspaceId} />

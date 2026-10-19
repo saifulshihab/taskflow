@@ -1,7 +1,6 @@
-"use server";
-
-import { revalidatePath } from "next/cache";
-import { api } from "@/lib/api";
+import { apiClient } from "@/lib/api-client";
+import { getQueryClient } from "@/lib/query-client";
+import { queryKeys } from "@/lib/query-keys";
 import {
   field,
   optionalField,
@@ -16,7 +15,7 @@ export async function createLabelAction(
   const workspaceId = field(formData, "workspaceId");
 
   try {
-    await api(`/workspaces/${workspaceId}/labels`, {
+    await apiClient(`/workspaces/${workspaceId}/labels`, {
       method: "POST",
       body: {
         name: field(formData, "name"),
@@ -27,7 +26,9 @@ export async function createLabelAction(
     return toFormState(error);
   }
 
-  revalidatePath(`/w/${workspaceId}/labels`);
+  void getQueryClient().invalidateQueries({
+    queryKey: queryKeys.labels(workspaceId),
+  });
   return { ok: true };
 }
 
@@ -39,7 +40,7 @@ export async function updateLabelAction(
   const labelId = field(formData, "labelId");
 
   try {
-    await api(`/labels/${labelId}`, {
+    await apiClient(`/labels/${labelId}`, {
       method: "PATCH",
       body: {
         name: field(formData, "name"),
@@ -50,7 +51,9 @@ export async function updateLabelAction(
     return toFormState(error);
   }
 
-  revalidatePath(`/w/${workspaceId}/labels`);
+  void getQueryClient().invalidateQueries({
+    queryKey: queryKeys.labels(workspaceId),
+  });
   return { ok: true };
 }
 
@@ -59,11 +62,13 @@ export async function deleteLabelAction(formData: FormData): Promise<FormState> 
   const labelId = field(formData, "labelId");
 
   try {
-    await api(`/labels/${labelId}`, { method: "DELETE" });
+    await apiClient(`/labels/${labelId}`, { method: "DELETE" });
   } catch (error) {
     return toFormState(error);
   }
 
-  revalidatePath(`/w/${workspaceId}/labels`);
+  void getQueryClient().invalidateQueries({
+    queryKey: queryKeys.labels(workspaceId),
+  });
   return { ok: true };
 }
