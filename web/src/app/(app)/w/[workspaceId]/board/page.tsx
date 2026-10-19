@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { ProjectSwitcher } from "@/components/projects/project-switcher";
 import { EmptyState, PageHeader } from "@/components/page-header";
 import { buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -33,7 +32,9 @@ export default function BoardPickerPage() {
     const match = stored ? projects.find((p) => p.id === stored) : undefined;
     const target = match ?? projects[0];
     setStoredBoardProjectId(workspaceId, target.id);
-    router.replace(`/w/${workspaceId}/board/${target.id}`);
+    router.replace(
+      `/w/${workspaceId}/p/${target.id}/board`,
+    );
   }, [data, isError, isPending, router, workspaceId]);
 
   if (isPending) {
@@ -56,9 +57,10 @@ export default function BoardPickerPage() {
 
   return (
     <>
-      <PageHeader title="Board" description="Pick a project to view its board.">
-        <ProjectSwitcher workspaceId={workspaceId} />
-      </PageHeader>
+      <PageHeader
+        title="Board"
+        description="Pick a project from the sidebar to view its board."
+      />
       <div className="p-4 md:p-6">
         <EmptyState
           title="No projects yet"

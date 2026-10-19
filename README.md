@@ -151,7 +151,7 @@ src/                    # Express API
   modules/<auth|workspaces|projects|tasks|labels|comments|activity>/
                         *.routes.ts  *.controller.ts  *.service.ts  *.schema.ts
 
-web/                    # Next.js app
+web/                    # Next.js app (see web/ARCHITECTURE.md for URL + project context)
   src/app/              routes (auth, workspaces, /w/[workspaceId]/…)
   src/components/       UI, app shell, tasks (board, table, detail)
   src/lib/              api client, Server Actions, RBAC helpers, data loaders

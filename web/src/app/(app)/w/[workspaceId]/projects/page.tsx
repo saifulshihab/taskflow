@@ -124,7 +124,7 @@ export default function ManageProjectsPage() {
             {projects.data.map((project) => (
               <Link
                 key={project.id}
-                href={`/w/${workspaceId}/board/${project.id}`}
+                href={`/w/${workspaceId}/p/${project.id}/board`}
                 className="rounded-xl border p-4 transition-colors hover:bg-muted/40"
               >
                 <div className="mb-2 flex items-center justify-between gap-2">

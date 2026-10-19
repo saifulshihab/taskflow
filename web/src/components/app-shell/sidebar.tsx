@@ -8,25 +8,60 @@ import {
   TagIcon,
   UsersIcon,
 } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { ProjectSwitcher } from "@/components/projects/project-switcher";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMe, useWorkspace, useWorkspaces } from "@/lib/queries";
+import {
+  parseProjectIdFromPathname,
+  projectPath,
+} from "@/lib/project-paths";
+import { can } from "@/lib/rbac";
 import { NavLink } from "./nav-link";
 import { UserMenu } from "./user-menu";
 import { WorkspaceSwitcher } from "./workspace-switcher";
 
-function navItems(workspaceId: string) {
+function navItems(workspaceId: string, projectId: string | undefined) {
   const base = `/w/${workspaceId}`;
+  if (projectId) {
+    return [
+      {
+        href: projectPath(workspaceId, projectId, "board"),
+        label: "Board",
+        icon: KanbanIcon,
+        exact: false,
+      },
+      {
+        href: projectPath(workspaceId, projectId, "tasks"),
+        label: "Tasks",
+        icon: ListChecksIcon,
+      },
+      {
+        href: projectPath(workspaceId, projectId, "labels"),
+        label: "Labels",
+        icon: TagIcon,
+      },
+      {
+        href: projectPath(workspaceId, projectId, "members"),
+        label: "Members",
+        icon: UsersIcon,
+      },
+      { href: `${base}/activity`, label: "Activity", icon: ActivityIcon },
+    ];
+  }
   return [
     { href: `${base}/board`, label: "Board", icon: KanbanIcon, exact: false },
     { href: `${base}/tasks`, label: "Tasks", icon: ListChecksIcon },
     { href: `${base}/labels`, label: "Labels", icon: TagIcon },
     { href: `${base}/members`, label: "Members", icon: UsersIcon },
     { href: `${base}/activity`, label: "Activity", icon: ActivityIcon },
-    { href: `${base}/settings`, label: "Settings", icon: SettingsIcon },
   ];
 }
 
 export function SidebarContent({ workspaceId }: { workspaceId: string }) {
+  const pathname = usePathname();
+  const projectId = parseProjectIdFromPathname(pathname ?? "");
+
   const workspaceQuery = useWorkspace(workspaceId);
   const workspacesQuery = useWorkspaces({ pageSize: 100 });
   const meQuery = useMe();
@@ -51,20 +86,35 @@ export function SidebarContent({ workspaceId }: { workspaceId: string }) {
     );
   }
 
+  const workspace = workspaceQuery.data;
+  const showSettings = can(workspace.role, "ADMIN");
+  const items = navItems(workspaceId, projectId);
+
   return (
     <div className="flex h-full flex-col gap-2 p-2">
       <WorkspaceSwitcher
-        current={workspaceQuery.data}
+        current={workspace}
         workspaces={workspacesQuery.data?.data ?? []}
       />
 
+      <ProjectSwitcher
+        workspaceId={workspaceId}
+        currentProjectId={projectId}
+      />
+
       <nav className="flex flex-1 flex-col gap-0.5">
-        {navItems(workspaceId).map((item) => (
+        {items.map((item) => (
           <NavLink key={item.href} href={item.href} exact={item.exact}>
             <item.icon className="size-4" />
             {item.label}
           </NavLink>
         ))}
+        {showSettings && (
+          <NavLink href={`/w/${workspaceId}/settings`}>
+            <SettingsIcon className="size-4" />
+            Settings
+          </NavLink>
+        )}
       </nav>
 
       <UserMenu user={meQuery.data} />
@@ -75,6 +125,7 @@ export function SidebarContent({ workspaceId }: { workspaceId: string }) {
 export function SidebarSkeleton() {
   return (
     <div className="flex h-full flex-col gap-2 p-2">
+      <Skeleton className="h-10 w-full" />
       <Skeleton className="h-10 w-full" />
       <div className="flex flex-1 flex-col gap-1 pt-2">
         {Array.from({ length: 6 }).map((_, index) => (

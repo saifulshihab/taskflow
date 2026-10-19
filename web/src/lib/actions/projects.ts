@@ -2,6 +2,7 @@ import { apiClient } from "@/lib/api-client";
 import type { Project, ProjectStatus } from "@/lib/api-types";
 import { invalidateProjectViews } from "@/lib/invalidate";
 import { getQueryClient } from "@/lib/query-client";
+import { projectPath } from "@/lib/project-paths";
 import { queryKeys } from "@/lib/query-keys";
 import {
   field,
@@ -36,7 +37,10 @@ export async function createProjectAction(
   void getQueryClient().invalidateQueries({
     queryKey: queryKeys.projects(workspaceId),
   });
-  return { ok: true, redirect: `/w/${workspaceId}/board/${project.id}` };
+  return {
+    ok: true,
+    redirect: projectPath(workspaceId, project.id, "board"),
+  };
 }
 
 export async function updateProjectAction(

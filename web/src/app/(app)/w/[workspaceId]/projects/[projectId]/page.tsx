@@ -2,6 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { projectPath } from "@/lib/project-paths";
 
 export default function LegacyProjectBoardRedirect() {
   const params = useParams();
@@ -10,7 +11,7 @@ export default function LegacyProjectBoardRedirect() {
   const projectId = String(params.projectId);
 
   useEffect(() => {
-    router.replace(`/w/${workspaceId}/board/${projectId}`);
+    router.replace(projectPath(workspaceId, projectId, "board"));
   }, [projectId, router, workspaceId]);
 
   return null;

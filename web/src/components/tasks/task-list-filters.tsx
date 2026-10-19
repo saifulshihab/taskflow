@@ -8,6 +8,8 @@ import {
   TASK_STATUSES,
   type Project,
 } from "@/lib/api-types";
+import type { ProjectSection } from "@/lib/project-paths";
+import { projectPath } from "@/lib/project-paths";
 import type { TaskListQuery } from "@/lib/task-query";
 import { PRIORITY_LABELS, TASK_STATUS_LABELS } from "@/lib/format";
 
@@ -16,14 +18,17 @@ export function TaskListFilters({
   query,
   projects,
   fixedProjectId,
+  filterSection = "board/list",
 }: {
   workspaceId: string;
   query: TaskListQuery;
   projects: Project[];
   fixedProjectId?: string;
+  /** Form target when `fixedProjectId` is set (list view vs project tasks page). */
+  filterSection?: Extract<ProjectSection, "board/list" | "tasks">;
 }) {
   const action = fixedProjectId
-    ? `/w/${workspaceId}/board/${fixedProjectId}/list`
+    ? projectPath(workspaceId, fixedProjectId, filterSection)
     : `/w/${workspaceId}/tasks`;
 
   return (

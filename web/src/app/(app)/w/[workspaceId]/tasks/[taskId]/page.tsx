@@ -9,6 +9,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
+import { projectPath } from "@/lib/project-paths";
 import { useTaskDetailContext } from "@/lib/queries";
 
 export default function TaskDetailPage() {
@@ -25,7 +26,11 @@ export default function TaskDetailPage() {
   if (isPending) return <Skeleton className="m-6 h-96 w-full" />;
   if (isError || !context) notFound();
 
-  const projectHref = `/w/${workspaceId}/board/${context.task.projectId}`;
+  const projectHref = projectPath(
+    workspaceId,
+    context.task.projectId,
+    "board",
+  );
 
   const refresh = () => {
     void queryClient.invalidateQueries({

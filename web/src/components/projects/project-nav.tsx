@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { cn } from "cn";
+import { projectPath } from "@/lib/project-paths";
 
 export function ProjectNav({
   workspaceId,
@@ -10,10 +11,17 @@ export function ProjectNav({
   projectId: string;
   active: "board" | "list";
 }) {
-  const base = `/w/${workspaceId}/board/${projectId}`;
   const items = [
-    { href: base, label: "Board", key: "board" as const },
-    { href: `${base}/list`, label: "List", key: "list" as const },
+    {
+      href: projectPath(workspaceId, projectId, "board"),
+      label: "Board",
+      key: "board" as const,
+    },
+    {
+      href: projectPath(workspaceId, projectId, "board/list"),
+      label: "List",
+      key: "list" as const,
+    },
   ];
 
   return (

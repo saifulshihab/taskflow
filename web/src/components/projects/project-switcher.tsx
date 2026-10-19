@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { ChevronsUpDownIcon, FolderKanbanIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,6 +14,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { Project } from "@/lib/api-types";
 import { setStoredBoardProjectId } from "@/lib/board-project-storage";
+import {
+  projectPath,
+  projectSectionFromPathname,
+} from "@/lib/project-paths";
 import { useProjects } from "@/lib/queries";
 
 export function ProjectSwitcher({
@@ -24,6 +28,7 @@ export function ProjectSwitcher({
   currentProjectId?: string;
 }) {
   const router = useRouter();
+  const pathname = usePathname() ?? "";
   const { data, isPending } = useProjects(workspaceId, {
     pageSize: 100,
     includeArchived: false,
@@ -34,7 +39,8 @@ export function ProjectSwitcher({
 
   const selectProject = (projectId: string) => {
     setStoredBoardProjectId(workspaceId, projectId);
-    router.push(`/w/${workspaceId}/board/${projectId}`);
+    const section = projectSectionFromPathname(pathname);
+    router.push(projectPath(workspaceId, projectId, section));
   };
 
   return (
@@ -43,7 +49,7 @@ export function ProjectSwitcher({
         render={
           <Button
             variant="outline"
-            className="h-auto min-w-48 justify-between gap-2 px-3 py-2"
+            className="h-auto min-w-0 w-full justify-between gap-2 px-3 py-2"
             disabled={isPending}
           />
         }

@@ -3,7 +3,6 @@
 import { ActionDialog } from "@/components/dialog-form";
 import { ProjectActions } from "@/components/projects/project-actions";
 import { ProjectNav } from "@/components/projects/project-nav";
-import { ProjectSwitcher } from "@/components/projects/project-switcher";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,7 +35,6 @@ export function ProjectBoardHeader({
         (project.description ?? `${project.key} · ${project.name}`)
       }
     >
-      <ProjectSwitcher workspaceId={workspaceId} currentProjectId={projectId} />
       <ProjectNav workspaceId={workspaceId} projectId={projectId} active={active} />
       {active === "board" && (
         <>

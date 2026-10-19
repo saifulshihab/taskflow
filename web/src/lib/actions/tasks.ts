@@ -5,6 +5,7 @@ import {
   invalidateTaskViews,
   patchTaskInProjectTasksCache,
 } from "@/lib/invalidate";
+import { projectPath } from "@/lib/project-paths";
 import { getQueryClient } from "@/lib/query-client";
 import {
   field,
@@ -100,7 +101,7 @@ export async function deleteTaskAction(formData: FormData): Promise<FormState> {
   return {
     ok: true,
     redirect: projectId
-      ? `/w/${workspaceId}/board/${projectId}`
+      ? projectPath(workspaceId, projectId, "board")
       : `/w/${workspaceId}/tasks`,
   };
 }
