@@ -13,6 +13,7 @@ This document describes proposed permissions for the redesigned app. It does not
 - ❓ Unresolved: a requirement still needs a user decision.
 - ❌ also marks removed or unavailable features; their Notes distinguish these from restricted actions.
 - Role names are exactly `WORKSPACE_OWNER`, `ADMIN`, and `MEMBER`. There is no `VIEWER` role in the new model.
+- The HTML is a layout/workflow concept. Implementation uses the app's existing design system and shadcn/ui components; do not introduce a separate redesign directory, stylesheet, or parallel styling system.
 - WORKSPACE_OWNER has access to every project in their workspace. ADMIN and MEMBER can access only projects they are assigned to. Unassigned projects must not appear in search, activity, counts, or navigation.
 - ADMIN and MEMBER are project-specific roles. There is no workspace-wide Admin role. A user can own a workspace and have a different role in another workspace/project.
 - Each workspace has exactly one WORKSPACE_OWNER. Only that owner may transfer ownership to an active workspace user. Transfer explicitly sets the former owner's project assignments and roles; it does not add a second owner.
@@ -26,7 +27,7 @@ This document describes proposed permissions for the redesigned app. It does not
 - Project admins may manage other admins, but cannot remove or demote themselves. A project may have no admin because the workspace owner retains control.
 - Saved views are personal to their creator and project. Subtasks remain full nested tasks with independent fields. Keep Active / Paused / Completed project statuses.
 - Save personal preferences per account and board settings per project. Appearance controls are available on desktop and mobile.
-- Existing local data will be discarded with a full local database reset during implementation. No existing-data migration is required. This decision applies only to the local database; no database reset has been executed during requirements work.
+- Existing data in the app's configured Prisma Postgres development/production database will be discarded during implementation. No existing-data migration is required. The user clarified that "local" referred to this existing hosted database, not a new local PostgreSQL instance. The configured hosted database reset has now been executed.
 - Personal settings apply to the signed-in actor's own account.
 - No email-sending features are included. Remove email notification preferences, reminders, digests, and email-based password reset from the redesign. Email remains an account identifier and can be used to look up existing users.
 - Supported deletions offer Undo for six seconds. Once that window expires, deletion is permanent through the application's recovery flow. Preserve required authored history under R4/R11.
@@ -222,7 +223,7 @@ All allowed task actions below apply to accessible, active projects. Admins/memb
 | R7 | Undo | Offer Undo for six seconds for deletion of tasks, labels, projects, and workspace-member removal. After expiry, deletion is permanent through the application's recovery flow. Enforce current permissions on recovery, preserve required history, and preserve concurrent edits rather than restoring global snapshots. | Agreed: six seconds, with no longer recovery window. |
 | R8 | Saved views | Personal only; persisted per creator and project. No sharing or changes to another user's views. | Agreed. |
 | R9 | Account provisioning | Users register themselves. Owners add existing accounts by email; project admins add existing workspace users to projects. No invitations. | Agreed. |
-| R10 | Existing local data | Discard the entire local database and initialize the redesigned schema with fresh data. No existing-data migration, role mapping, label conversion, or legacy membership backfill is required. Schema creation/versioning is still required for fresh installs. | Agreed. Local reset will occur during implementation against a verified local target; not executed during requirements work. No remote/production reset is authorized by this decision. |
+| R10 | Existing database data | Discard the existing configured Prisma Postgres development/production database data and initialize the redesigned schema with fresh data. No existing-data migration, role mapping, label conversion, or legacy membership backfill is required. Schema creation/versioning is still required for fresh installs. | Agreed. Reset the existing configured hosted Prisma Postgres database as clarified by the user. Verify the configured target before execution; the configured hosted database reset has now been executed. |
 | R11 | Existing capabilities and account deletion | Retain Active / Paused / Completed project statuses. Users may edit own comments and owner/admin may edit labels. Before deleting an account, transfer or delete its owned workspaces; retain surviving authored history. | Agreed. |
 | R12 | Preferences and notifications | Persist personal preferences per account and board settings per project. Appearance controls on desktop and mobile. Exclude all email sending, including notification/reminder/digest emails and email-based password reset; remove the associated email preference controls. | Agreed: no email-sending features. |
 
@@ -232,4 +233,4 @@ All decisions raised during requirements review are resolved. Undo lasts six sec
 
 ## Review and implementation notes
 
-Keep existing feature IDs stable when making further corrections. User decisions take precedence over prototype controls and copy. This document records requirements only; application implementation and the local database reset have not started.
+Keep existing feature IDs stable when making further corrections. User decisions take precedence over prototype controls and copy. This document records agreed requirements. Implementation is in progress; the existing configured hosted Prisma Postgres database has been reset. See REDESIGN_IMPLEMENTATION_TRACKER.md for current implementation and verification status.

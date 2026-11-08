@@ -36,6 +36,7 @@ export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
   BACKLOG: "Backlog",
   TODO: "To do",
   IN_PROGRESS: "In progress",
+  IN_REVIEW: "In review",
   DONE: "Done",
   CANCELLED: "Cancelled",
 };
@@ -54,10 +55,9 @@ export const PROJECT_STATUS_LABELS: Record<ProjectStatus, string> = {
 };
 
 export const ROLE_LABELS: Record<Role, string> = {
-  OWNER: "Owner",
+  WORKSPACE_OWNER: "Owner",
   ADMIN: "Admin",
   MEMBER: "Member",
-  VIEWER: "Viewer",
 };
 
 export const PRIORITY_CLASSES: Record<Priority, string> = {
@@ -71,6 +71,7 @@ export const TASK_STATUS_CLASSES: Record<TaskStatus, string> = {
   BACKLOG: "bg-muted-foreground/40",
   TODO: "bg-sky-500",
   IN_PROGRESS: "bg-amber-500",
+  IN_REVIEW: "bg-violet-500",
   DONE: "bg-emerald-500",
   CANCELLED: "bg-muted-foreground/40",
 };

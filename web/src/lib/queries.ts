@@ -166,7 +166,7 @@ export function useTaskDetailContext(workspaceId: string, taskId: string | null)
         comments: comments.data,
         me,
         canEdit: can(workspace.role, "MEMBER"),
-        canModerateComments: can(workspace.role, "ADMIN"),
+        canModerateComments: false,
       };
     },
     enabled: Boolean(workspaceId && taskId),

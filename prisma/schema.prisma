@@ -10,10 +10,9 @@ datasource db {
 }
 
 enum Role {
-  OWNER
+  WORKSPACE_OWNER
   ADMIN
   MEMBER
-  VIEWER
 }
 
 enum ProjectStatus {
@@ -26,6 +25,7 @@ enum TaskStatus {
   BACKLOG
   TODO
   IN_PROGRESS
+  IN_REVIEW
   DONE
   CANCELLED
 }
@@ -42,15 +42,23 @@ model User {
   email        String   @unique
   name         String
   passwordHash String
+  avatar       String?
+  jobTitle     String   @default("")
+  bio          String   @default("")
+  timezone     String   @default("Asia/Dhaka")
+  theme        String   @default("system")
+  startPage    String   @default("board")
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  memberships   Membership[]
-  refreshTokens RefreshToken[]
-  createdTasks  Task[]          @relation("TaskCreator")
-  assignedTasks Task[]          @relation("TaskAssignee")
-  comments      Comment[]
-  activity      ActivityEvent[]
+  memberships     Membership[]
+  refreshTokens   RefreshToken[]
+  createdTasks    Task[]          @relation("TaskCreator")
+  assignedTasks   Task[]          @relation("TaskAssignee")
+  comments        Comment[]
+  activity        ActivityEvent[]
+  ownedWorkspaces Workspace[]     @relation("WorkspaceOwner")
+  savedViews      SavedView[]
 }
 
 model RefreshToken {
@@ -70,46 +78,73 @@ model Workspace {
   id        String   @id @default(uuid(7))
   name      String
   slug      String   @unique
+  ownerId   String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   memberships Membership[]
   projects    Project[]
-  labels      Label[]
   activity    ActivityEvent[]
+  owner       User            @relation("WorkspaceOwner", fields: [ownerId], references: [id])
 }
 
 model Membership {
-  id          String   @id @default(uuid(7))
+  id          String    @id @default(uuid(7))
   userId      String
   workspaceId String
-  role        Role     @default(MEMBER)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  active      Boolean   @default(true)
+  deletedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  projects  ProjectMembership[]
 
   @@unique([userId, workspaceId])
   @@index([workspaceId])
 }
 
 model Project {
-  id          String        @id @default(uuid(7))
-  workspaceId String
-  name        String
-  key         String
-  description String?
-  status      ProjectStatus @default(ACTIVE)
-  archivedAt  DateTime?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  id              String        @id @default(uuid(7))
+  workspaceId     String
+  name            String
+  key             String
+  description     String?
+  status          ProjectStatus @default(ACTIVE)
+  archivedAt      DateTime?
+  deletedAt       DateTime?
+  color           String        @default("#0E7490")
+  seats           Int           @default(10)
+  sequence        Int           @default(0)
+  defaultStatus   TaskStatus    @default(TODO)
+  defaultPriority Priority      @default(MEDIUM)
+  showCancelled   Boolean       @default(true)
+  wipLimit        Int           @default(0)
+  cardFields      Json          @default("{\"assignee\":true,\"due\":true,\"labels\":true,\"subtasks\":true,\"comments\":true}")
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  tasks     Task[]
+  workspace  Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  tasks      Task[]
+  members    ProjectMembership[]
+  labels     Label[]
+  savedViews SavedView[]
 
   @@unique([workspaceId, key])
   @@index([workspaceId, status])
+}
+
+model ProjectMembership {
+  projectId    String
+  membershipId String
+  role         Role       @default(MEMBER)
+  createdAt    DateTime   @default(now())
+  project      Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  membership   Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, membershipId])
+  @@index([membershipId])
 }
 
 model Task {
@@ -125,6 +160,8 @@ model Task {
   dueDate      DateTime?
   completedAt  DateTime?
   position     Int        @default(0)
+  number       Int
+  deletedAt    DateTime?
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
@@ -136,6 +173,7 @@ model Task {
   labels     TaskLabel[]
   comments   Comment[]
 
+  @@unique([projectId, number])
   @@index([projectId, status])
   @@index([assigneeId])
   @@index([parentTaskId])
@@ -144,16 +182,17 @@ model Task {
 }
 
 model Label {
-  id          String   @id @default(uuid(7))
-  workspaceId String
-  name        String
-  color       String   @default("#6b7280")
-  createdAt   DateTime @default(now())
+  id        String    @id @default(uuid(7))
+  projectId String
+  deletedAt DateTime?
+  name      String
+  color     String    @default("#6b7280")
+  createdAt DateTime  @default(now())
 
-  workspace Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  tasks     TaskLabel[]
+  project Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tasks   TaskLabel[]
 
-  @@unique([workspaceId, name])
+  @@unique([projectId, name])
 }
 
 model TaskLabel {
@@ -188,6 +227,7 @@ model Comment {
 model ActivityEvent {
   id          String   @id @default(uuid(7))
   workspaceId String
+  projectId   String?
   actorId     String?
   entityType  String
   entityId    String
@@ -200,4 +240,29 @@ model ActivityEvent {
 
   @@index([workspaceId, createdAt])
   @@index([entityType, entityId])
+}
+
+model SavedView {
+  id        String   @id @default(uuid(7))
+  userId    String
+  projectId String
+  name      String
+  filters   Json
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([userId, projectId])
+}
+
+model Recovery {
+  id          String   @id @default(uuid(7))
+  actorId     String
+  workspaceId String
+  projectId   String?
+  entityType  String
+  entityId    String
+  expiresAt   DateTime
+
+  @@index([expiresAt])
 }

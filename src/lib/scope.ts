@@ -1,49 +1,59 @@
-import { notFound } from "./errors.js";
+import type { Prisma } from "../generated/prisma/client.js";
+import { badRequest, forbidden, notFound } from "./errors.js";
 import { prisma } from "./prisma.js";
-import { requireMembership } from "./rbac.js";
+import { atLeast, requireMembership } from "./rbac.js";
 import { Role } from "../generated/prisma/enums.js";
-
-/**
- * Resolves a project to its workspace and authorizes the actor there, so
- * project- and task-scoped routes do not have to carry the workspace id.
- */
 export const projectScope = async (
   actorId: string,
   projectId: string,
-  minimum: Role = Role.VIEWER,
+  minimum?: Role,
+  client: Prisma.TransactionClient | typeof prisma = prisma,
 ) => {
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-  });
-  if (!project) throw notFound("Project");
-
+  const project = await client.project.findUnique({ where: { id: projectId } });
+  if (!project || project.deletedAt) throw notFound("Project");
   const membership = await requireMembership(
     actorId,
     project.workspaceId,
-    minimum,
+    Role.MEMBER,
     "Project",
+    client,
   );
-
-  return { project, membership };
+  const assignment =
+    membership.role === Role.WORKSPACE_OWNER
+      ? null
+      : await client.projectMembership.findUnique({
+          where: {
+            projectId_membershipId: { projectId, membershipId: membership.id },
+          },
+        });
+  const role =
+    membership.role === Role.WORKSPACE_OWNER
+      ? Role.WORKSPACE_OWNER
+      : assignment?.role;
+  if (!role) throw notFound("Project");
+  if (minimum && !atLeast(role, minimum))
+    throw forbidden("Insufficient project permissions");
+  if (minimum && project.archivedAt)
+    throw badRequest("Restore the archived project before making changes");
+  return { project, membership: { ...membership, role } };
 };
-
 export const taskScope = async (
   actorId: string,
   taskId: string,
-  minimum: Role = Role.VIEWER,
+  minimum?: Role,
+  client: Prisma.TransactionClient | typeof prisma = prisma,
 ) => {
-  const task = await prisma.task.findUnique({
+  const task = await client.task.findUnique({
     where: { id: taskId },
-    include: { project: { select: { id: true, workspaceId: true } } },
+    include: { parentTask: { select: { deletedAt: true } } },
   });
-  if (!task) throw notFound("Task");
-
-  const membership = await requireMembership(
+  if (!task || task.deletedAt || task.parentTask?.deletedAt)
+    throw notFound("Task");
+  const { project, membership } = await projectScope(
     actorId,
-    task.project.workspaceId,
+    task.projectId,
     minimum,
-    "Task",
+    client,
   );
-
-  return { task, membership, workspaceId: task.project.workspaceId };
+  return { task, membership, workspaceId: project.workspaceId };
 };

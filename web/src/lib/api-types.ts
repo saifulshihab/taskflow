@@ -1,10 +1,11 @@
-export const ROLES = ["OWNER", "ADMIN", "MEMBER", "VIEWER"] as const;
+export const ROLES = ["WORKSPACE_OWNER", "ADMIN", "MEMBER"] as const;
 export type Role = (typeof ROLES)[number];
 
 export const TASK_STATUSES = [
   "BACKLOG",
   "TODO",
   "IN_PROGRESS",
+  "IN_REVIEW",
   "DONE",
   "CANCELLED",
 ] as const;
@@ -40,6 +41,7 @@ export interface Workspace {
   id: string;
   name: string;
   slug: string;
+  ownerId:string;
   createdAt: string;
   updatedAt?: string;
   role: Role;
@@ -111,7 +113,7 @@ export interface ActivityEvent {
   id: string;
   workspaceId: string;
   actorId: string | null;
-  entityType: "workspace" | "membership" | "project" | "task" | "comment";
+  entityType: "workspace" | "membership" | "project" | "task" | "comment" | "label";
   entityId: string;
   action: string;
   metadata: Record<string, unknown> | null;

@@ -3,6 +3,7 @@ import { route } from "../../lib/http.js";
 import { paginationSchema } from "../../lib/pagination.js";
 import {
   addMemberSchema,
+  transferSchema,
   createWorkspaceSchema,
   memberParams,
   updateMemberSchema,
@@ -56,12 +57,22 @@ export const workspacesController = {
         actorOf(req),
         params.workspaceId,
         params.userId,
-        body.role,
+        body.active,
       ),
   ),
 
+  transfer: route(
+    { params: workspaceIdParams, body: transferSchema },
+    ({ params, body, req }) =>
+      workspaceService.transfer(
+        actorOf(req),
+        params.workspaceId,
+        body.userId,
+        body.assignments,
+      ),
+  ),
   removeMember: route({ params: memberParams }, async ({ params, req }) => {
-    await workspaceService.removeMember(
+    return workspaceService.removeMember(
       actorOf(req),
       params.workspaceId,
       params.userId,

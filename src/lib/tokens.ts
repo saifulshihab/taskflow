@@ -6,6 +6,7 @@ import { unauthorized } from "./errors.js";
 export interface AccessTokenPayload {
   sub: string;
   email: string;
+  sid: string;
 }
 
 export const signAccessToken = (payload: AccessTokenPayload) =>
@@ -19,7 +20,13 @@ export const verifyAccessToken = (token: string): AccessTokenPayload => {
     if (typeof decoded === "string" || !decoded.sub) {
       throw unauthorized("Malformed access token");
     }
-    return { sub: decoded.sub, email: String(decoded["email"] ?? "") };
+    if (typeof decoded["sid"] !== "string")
+      throw unauthorized("Session expired");
+    return {
+      sub: decoded.sub,
+      email: String(decoded["email"] ?? ""),
+      sid: decoded["sid"],
+    };
   } catch (error) {
     if (error instanceof jwt.TokenExpiredError) {
       throw unauthorized("Access token expired");

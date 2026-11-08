@@ -14,8 +14,8 @@ export const taskLabelParams = z.object({
 export const createTaskSchema = z.object({
   title: z.string().trim().min(1).max(200),
   description: z.string().trim().max(10_000).optional(),
-  status: z.enum(TaskStatus).default(TaskStatus.BACKLOG),
-  priority: z.enum(Priority).default(Priority.MEDIUM),
+  status: z.enum(TaskStatus).optional(),
+  priority: z.enum(Priority).optional(),
   assigneeId: z.uuid().nullish(),
   parentTaskId: z.uuid().nullish(),
   dueDate: z.coerce.date().nullish(),
@@ -82,6 +82,8 @@ export const listTasksQuery = paginationSchema.extend({
       "-dueDate",
       "priority",
       "-priority",
+      "title",
+      "-title",
       "position",
       "-position",
     ])

@@ -1,10 +1,9 @@
 import type { Role } from "./api-types";
 
 const rank: Record<Role, number> = {
-  VIEWER: 0,
   MEMBER: 1,
   ADMIN: 2,
-  OWNER: 3,
+  WORKSPACE_OWNER: 3,
 };
 
 /**
