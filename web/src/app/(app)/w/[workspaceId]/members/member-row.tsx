@@ -23,7 +23,7 @@ export function MemberRowActions({
 }) {
   const [pending, startTransition] = useTransition();
   const assignableRoles = ROLES.filter(
-    (role) => role !== "OWNER" || can(actorRole, "OWNER"),
+    (role) => role !== "WORKSPACE_OWNER" || can(actorRole, "WORKSPACE_OWNER"),
   );
 
   const onRoleChange = (role: string) => {

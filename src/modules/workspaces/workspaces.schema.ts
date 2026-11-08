@@ -30,13 +30,24 @@ export const updateWorkspaceSchema = z
 
 export const addMemberSchema = z.object({
   email: z.email().toLowerCase(),
-  role: z.enum(Role).default(Role.MEMBER),
 });
 
 export const updateMemberSchema = z.object({
-  role: z.enum(Role),
+  active: z.boolean(),
 });
 
 export type CreateWorkspaceInput = z.infer<typeof createWorkspaceSchema>;
 export type UpdateWorkspaceInput = z.infer<typeof updateWorkspaceSchema>;
 export type AddMemberInput = z.infer<typeof addMemberSchema>;
+
+export const transferSchema = z.object({
+  userId: z.uuid(),
+  assignments: z
+    .array(
+      z.object({
+        projectId: z.uuid(),
+        role: z.enum([Role.ADMIN, Role.MEMBER]),
+      }),
+    )
+    .max(100),
+});

@@ -42,6 +42,6 @@ export const projectsController = {
   ),
 
   remove: route({ params: projectIdParams }, async ({ params, req }) => {
-    await projectService.remove(actorOf(req), params.projectId);
+    return projectService.remove(actorOf(req), params.projectId);
   }),
 };

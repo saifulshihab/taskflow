@@ -1,46 +1,38 @@
 "use client";
-
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import { hasSession } from "@/lib/auth-storage";
-
-const PUBLIC_PATHS = ["/login", "/register"];
-
+const subscribe = (notify: () => void) => {
+  window.addEventListener("storage", notify);
+  return () => window.removeEventListener("storage", notify);
+};
 export function AuthGuard({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const [ready, setReady] = useState(false);
-
+  const pathname = usePathname(),
+    router = useRouter(),
+    search = useSearchParams();
+  const authed = useSyncExternalStore(subscribe, hasSession, () => false);
+  const hydrated = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
+  const isPublic = ["/login", "/register"].some(
+    (p) => pathname === p || pathname.startsWith(p + "/"),
+  );
   useEffect(() => {
-    const isPublic = PUBLIC_PATHS.some(
-      (path) => pathname === path || pathname.startsWith(`${path}/`),
-    );
-    const authed = hasSession();
-
+    if (!hydrated) return;
     if (!authed && !isPublic) {
-      const next = `${pathname}${searchParams.size ? `?${searchParams}` : ""}`;
+      const next = pathname + (search.size ? "?" + search : "");
       router.replace(
-        next === "/" ? "/login" : `/login?next=${encodeURIComponent(next)}`,
+        next === "/" ? "/login" : "/login?next=" + encodeURIComponent(next),
       );
-      return;
-    }
-
-    if (authed && isPublic) {
-      router.replace("/");
-      return;
-    }
-
-    setReady(true);
-  }, [pathname, router, searchParams]);
-
-  if (!ready) {
+    } else if (authed && isPublic) router.replace("/");
+  }, [authed, isPublic, hydrated, pathname, search, router]);
+  if (!hydrated || (!authed && !isPublic) || (authed && isPublic))
     return (
-      <div className="text-muted-foreground flex min-h-svh items-center justify-center text-sm">
-        Loading…
+      <div className="flex min-h-svh items-center justify-center text-sm">
+        Loading...
       </div>
     );
-  }
-
   return children;
 }

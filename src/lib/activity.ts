@@ -2,10 +2,11 @@ import { prisma } from "./prisma.js";
 import type { Prisma } from "../generated/prisma/client.js";
 
 export type EntityType =
-  "workspace" | "membership" | "project" | "task" | "comment";
+  "workspace" | "membership" | "project" | "task" | "comment" | "label";
 
 export interface ActivityInput {
   workspaceId: string;
+  projectId?: string;
   actorId: string | null;
   entityType: EntityType;
   entityId: string;
@@ -24,6 +25,7 @@ export const recordActivity = (
   client.activityEvent.create({
     data: {
       workspaceId: input.workspaceId,
+      projectId: input.projectId,
       actorId: input.actorId,
       entityType: input.entityType,
       entityId: input.entityId,

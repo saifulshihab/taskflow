@@ -2,7 +2,7 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { TaskDetailPanels } from "@/components/tasks/task-detail-panels";
 import { buttonVariants } from "@/components/ui/button";
 import {
@@ -37,16 +37,15 @@ export function TaskDetailDialog({
   const activeTaskId =
     selection?.rootTaskId === taskId ? selection.selectedTaskId : taskId;
 
-  const { data: context, isPending, isError, error } = useTaskDetailContext(
+  const {
+    data: context,
+    isPending,
+    isError,
+    error,
+  } = useTaskDetailContext(
     workspaceId,
     open && activeTaskId ? activeTaskId : null,
   );
-
-  useEffect(() => {
-    if (!open) {
-      setSelection(null);
-    }
-  }, [open]);
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) setSelection(null);
@@ -67,7 +66,11 @@ export function TaskDetailDialog({
     context?.task.title ?? previewTitle ?? (isPending ? "Loading…" : "Task");
 
   const errorMessage =
-    isError && error instanceof Error ? error.message : isError ? "Task not found" : null;
+    isError && error instanceof Error
+      ? error.message
+      : isError
+        ? "Task not found"
+        : null;
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -130,7 +133,8 @@ export function TaskDetailDialog({
               onDeleted={() => handleOpenChange(false)}
               subtaskLinkMode="modal"
               onSubtaskSelect={(selectedTaskId) => {
-                if (taskId) setSelection({ rootTaskId: taskId, selectedTaskId });
+                if (taskId)
+                  setSelection({ rootTaskId: taskId, selectedTaskId });
               }}
             />
           )}

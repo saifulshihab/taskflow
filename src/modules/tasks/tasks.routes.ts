@@ -25,3 +25,5 @@ tasksRouter.patch("/:taskId/status", tasksController.setStatus);
 tasksRouter.patch("/:taskId/assignee", tasksController.setAssignee);
 tasksRouter.post("/:taskId/labels", tasksController.attachLabel);
 tasksRouter.delete("/:taskId/labels/:labelId", tasksController.detachLabel);
+
+tasksRouter.post("/:taskId/duplicate", tasksController.duplicate);

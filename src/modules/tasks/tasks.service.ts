@@ -2,10 +2,11 @@ import { recordActivity } from "../../lib/activity.js";
 import { badRequest, conflict, notFound } from "../../lib/errors.js";
 import { paginated, toSkipTake } from "../../lib/pagination.js";
 import { prisma } from "../../lib/prisma.js";
-import { requireMembership } from "../../lib/rbac.js";
+import { requireMembership, visibleProjects } from "../../lib/rbac.js";
 import { projectScope, taskScope } from "../../lib/scope.js";
 import type { Actor } from "../../lib/actor.js";
 import type { Prisma } from "../../generated/prisma/client.js";
+import { scheduleDeletion } from "../../lib/recovery.js";
 import { Role, TaskStatus } from "../../generated/prisma/enums.js";
 import type {
   CreateTaskInput,
@@ -20,9 +21,16 @@ const taskInclude = {
   creator: { select: userSelect },
   project: { select: { id: true, key: true, name: true, workspaceId: true } },
   labels: {
-    select: { label: { select: { id: true, name: true, color: true } } },
+    select: {
+      label: { select: { id: true, name: true, color: true, deletedAt: true } },
+    },
   },
-  _count: { select: { subtasks: true, comments: true } },
+  _count: {
+    select: {
+      subtasks: { where: { deletedAt: null } },
+      comments: { where: { deletedAt: null } },
+    },
+  },
 } as const;
 
 type TaskWithRelations = Prisma.TaskGetPayload<{ include: typeof taskInclude }>;
@@ -30,23 +38,28 @@ type TaskWithRelations = Prisma.TaskGetPayload<{ include: typeof taskInclude }>;
 // Flatten the join rows so clients see labels, not TaskLabel records.
 const present = (task: TaskWithRelations) => ({
   ...task,
-  labels: task.labels.map((entry) => entry.label),
+  key: task.project.key + "-" + task.number,
+  labels: task.labels.map((entry) => entry.label).filter((l) => !l.deletedAt),
 });
 
 const assertAssignee = async (
-  workspaceId: string,
+  projectId: string,
   assigneeId: string | null | undefined,
 ) => {
   if (!assigneeId) return;
-  const membership = await prisma.membership.findUnique({
-    where: { userId_workspaceId: { userId: assigneeId, workspaceId } },
-    select: { id: true },
+  const project = await prisma.project.findUniqueOrThrow({
+    where: { id: projectId },
+    include: { workspace: true },
   });
-  if (!membership) {
-    throw badRequest("Assignee must be a member of the workspace");
-  }
+  if (project.workspace.ownerId === assigneeId) return;
+  const member = await prisma.projectMembership.findFirst({
+    where: {
+      projectId,
+      membership: { userId: assigneeId, active: true, deletedAt: null },
+    },
+  });
+  if (!member) throw badRequest("Assignee must be an active project user");
 };
-
 const assertParent = async (
   projectId: string,
   parentTaskId: string | null | undefined,
@@ -54,9 +67,9 @@ const assertParent = async (
   if (!parentTaskId) return;
   const parent = await prisma.task.findUnique({
     where: { id: parentTaskId },
-    select: { id: true, projectId: true, parentTaskId: true },
+    select: { id: true, projectId: true, parentTaskId: true, deletedAt: true },
   });
-  if (!parent || parent.projectId !== projectId) {
+  if (!parent || parent.deletedAt || parent.projectId !== projectId) {
     throw badRequest("Parent task must belong to the same project");
   }
   // One level of nesting keeps lists and completion rules predictable.
@@ -65,13 +78,13 @@ const assertParent = async (
   }
 };
 
-const assertLabels = async (workspaceId: string, labelIds: string[]) => {
+const assertLabels = async (projectId: string, labelIds: string[]) => {
   if (labelIds.length === 0) return;
   const found = await prisma.label.count({
-    where: { id: { in: labelIds }, workspaceId },
+    where: { id: { in: labelIds }, projectId, deletedAt: null },
   });
   if (found !== labelIds.length) {
-    throw badRequest("One or more labels do not belong to this workspace");
+    throw badRequest("One or more labels do not belong to this project");
   }
 };
 
@@ -89,7 +102,11 @@ const buildWhere = (
   scope: Prisma.TaskWhereInput,
   query: ListTasksQuery,
 ): Prisma.TaskWhereInput => {
-  const where: Prisma.TaskWhereInput = { ...scope };
+  const where: Prisma.TaskWhereInput = {
+    AND: [scope],
+    deletedAt: null,
+    OR: [{ parentTaskId: null }, { parentTask: { deletedAt: null } }],
+  };
 
   if (query.status) where.status = { in: query.status };
   if (query.priority) where.priority = { in: query.priority };
@@ -110,9 +127,14 @@ const buildWhere = (
   }
 
   if (query.search) {
-    where.OR = [
-      { title: { contains: query.search, mode: "insensitive" } },
-      { description: { contains: query.search, mode: "insensitive" } },
+    where.AND = [
+      scope,
+      {
+        OR: [
+          { title: { contains: query.search, mode: "insensitive" } },
+          { description: { contains: query.search, mode: "insensitive" } },
+        ],
+      },
     ];
   }
 
@@ -148,42 +170,52 @@ export const create = async (
   if (project.archivedAt) throw badRequest("Project is archived");
 
   const labelIds = input.labelIds ?? [];
-  await assertAssignee(project.workspaceId, input.assigneeId);
+  await assertAssignee(projectId, input.assigneeId);
   await assertParent(projectId, input.parentTaskId);
-  await assertLabels(project.workspaceId, labelIds);
+  await assertLabels(projectId, labelIds);
 
   const highest = await prisma.task.aggregate({
     where: { projectId },
     _max: { position: true },
   });
 
-  const task = await prisma.task.create({
-    data: {
-      projectId,
-      creatorId: actor.id,
-      title: input.title,
-      status: input.status,
-      priority: input.priority,
-      position: (highest._max.position ?? 0) + 1,
-      ...(input.description === undefined
-        ? {}
-        : { description: input.description }),
-      ...(input.assigneeId === undefined
-        ? {}
-        : { assigneeId: input.assigneeId }),
-      ...(input.parentTaskId === undefined
-        ? {}
-        : { parentTaskId: input.parentTaskId }),
-      ...(input.dueDate === undefined ? {} : { dueDate: input.dueDate }),
-      ...(input.status === TaskStatus.DONE ? { completedAt: new Date() } : {}),
-      ...(labelIds.length > 0
-        ? { labels: { create: labelIds.map((labelId) => ({ labelId })) } }
-        : {}),
-    },
-    include: taskInclude,
+  const task = await prisma.$transaction(async (tx) => {
+    const sequence = await tx.project.update({
+      where: { id: projectId },
+      data: { sequence: { increment: 1 } },
+    });
+    return tx.task.create({
+      data: {
+        projectId,
+        creatorId: actor.id,
+        number: sequence.sequence,
+        title: input.title,
+        status: input.status ?? project.defaultStatus,
+        priority: input.priority ?? project.defaultPriority,
+        position: (highest._max.position ?? 0) + 1,
+        ...(input.description === undefined
+          ? {}
+          : { description: input.description }),
+        ...(input.assigneeId === undefined
+          ? {}
+          : { assigneeId: input.assigneeId }),
+        ...(input.parentTaskId === undefined
+          ? {}
+          : { parentTaskId: input.parentTaskId }),
+        ...(input.dueDate === undefined ? {} : { dueDate: input.dueDate }),
+        ...((input.status ?? project.defaultStatus) === TaskStatus.DONE
+          ? { completedAt: new Date() }
+          : {}),
+        ...(labelIds.length > 0
+          ? { labels: { create: labelIds.map((labelId) => ({ labelId })) } }
+          : {}),
+      },
+      include: taskInclude,
+    });
   });
 
   await recordActivity({
+    projectId,
     workspaceId: project.workspaceId,
     actorId: actor.id,
     entityType: "task",
@@ -210,7 +242,11 @@ export const listForWorkspace = async (
   query: ListTasksQuery,
 ) => {
   await requireMembership(actor.id, workspaceId);
-  return runList(actor, { project: { workspaceId } }, query);
+  return runList(
+    actor,
+    { project: visibleProjects(actor.id, workspaceId) },
+    query,
+  );
 };
 
 export const get = async (actor: Actor, taskId: string) => {
@@ -228,7 +264,7 @@ export const get = async (actor: Actor, taskId: string) => {
 export const listSubtasks = async (actor: Actor, taskId: string) => {
   await taskScope(actor.id, taskId);
   const subtasks = await prisma.task.findMany({
-    where: { parentTaskId: taskId },
+    where: { parentTaskId: taskId, deletedAt: null },
     orderBy: { position: "asc" },
     include: taskInclude,
   });
@@ -243,7 +279,7 @@ export const update = async (
   const { task, workspaceId } = await taskScope(actor.id, taskId, Role.MEMBER);
 
   if (input.assigneeId !== undefined) {
-    await assertAssignee(workspaceId, input.assigneeId);
+    await assertAssignee(task.projectId, input.assigneeId);
   }
 
   const updated = await prisma.task.update({
@@ -256,6 +292,7 @@ export const update = async (
   });
 
   await recordActivity({
+    projectId: task.projectId,
     workspaceId,
     actorId: actor.id,
     entityType: "task",
@@ -291,19 +328,6 @@ export const setStatus = async (
   // A no-op transition should not show up in the activity feed.
   if (task.status === status) return get(actor, taskId);
 
-  // Closing a parent while subtasks are open hides unfinished work.
-  if (status === TaskStatus.DONE) {
-    const openSubtasks = await prisma.task.count({
-      where: {
-        parentTaskId: taskId,
-        status: { notIn: [TaskStatus.DONE, TaskStatus.CANCELLED] },
-      },
-    });
-    if (openSubtasks > 0) {
-      throw badRequest(`Task has ${openSubtasks} unfinished subtask(s)`);
-    }
-  }
-
   const updated = await prisma.task.update({
     where: { id: taskId },
     data: { status, ...completionPatch(task.status, status) },
@@ -311,6 +335,7 @@ export const setStatus = async (
   });
 
   await recordActivity({
+    projectId: task.projectId,
     workspaceId,
     actorId: actor.id,
     entityType: "task",
@@ -328,7 +353,7 @@ export const setAssignee = async (
   assigneeId: string | null,
 ) => {
   const { task, workspaceId } = await taskScope(actor.id, taskId, Role.MEMBER);
-  await assertAssignee(workspaceId, assigneeId);
+  await assertAssignee(task.projectId, assigneeId);
 
   const updated = await prisma.task.update({
     where: { id: taskId },
@@ -337,6 +362,7 @@ export const setAssignee = async (
   });
 
   await recordActivity({
+    projectId: task.projectId,
     workspaceId,
     actorId: actor.id,
     entityType: "task",
@@ -353,8 +379,8 @@ export const attachLabel = async (
   taskId: string,
   labelId: string,
 ) => {
-  const { workspaceId } = await taskScope(actor.id, taskId, Role.MEMBER);
-  await assertLabels(workspaceId, [labelId]);
+  const { task } = await taskScope(actor.id, taskId, Role.MEMBER);
+  await assertLabels(task.projectId, [labelId]);
 
   const existing = await prisma.taskLabel.findUnique({
     where: { taskId_labelId: { taskId, labelId } },
@@ -386,14 +412,31 @@ export const detachLabel = async (
 export const remove = async (actor: Actor, taskId: string) => {
   const { task, workspaceId } = await taskScope(actor.id, taskId, Role.MEMBER);
 
-  await prisma.task.delete({ where: { id: taskId } });
+  return scheduleDeletion(actor, workspaceId, "task", taskId, task.projectId);
+};
 
-  await recordActivity({
-    workspaceId,
-    actorId: actor.id,
-    entityType: "task",
-    entityId: taskId,
-    action: "task.deleted",
-    metadata: { title: task.title },
+export const duplicate = async (actor: Actor, id: string) => {
+  const source = await get(actor, id);
+  await projectScope(actor.id, source.projectId, Role.MEMBER);
+  const copy = await create(actor, source.projectId, {
+    title: source.title + " (copy)",
+    description: source.description ?? undefined,
+    status: source.status,
+    priority: source.priority,
+    assigneeId: source.assigneeId,
+    dueDate: source.dueDate,
+    labelIds: source.labels.map((l) => l.id),
   });
+  const subs = await listSubtasks(actor, id);
+  for (const sub of subs)
+    await create(actor, source.projectId, {
+      title: sub.title,
+      description: sub.description ?? undefined,
+      status: sub.status,
+      priority: sub.priority,
+      assigneeId: sub.assigneeId,
+      dueDate: sub.dueDate,
+      parentTaskId: copy.id,
+    });
+  return copy;
 };

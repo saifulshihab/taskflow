@@ -1,57 +1,61 @@
-import { conflict, notFound } from "../../lib/errors.js";
+import { recordActivity } from "../../lib/activity.js";
 import { prisma } from "../../lib/prisma.js";
-import { requireMembership } from "../../lib/rbac.js";
-import type { Actor } from "../../lib/actor.js";
+import { projectScope } from "../../lib/scope.js";
+import { notFound } from "../../lib/errors.js";
+import { scheduleDeletion } from "../../lib/recovery.js";
 import { Role } from "../../generated/prisma/enums.js";
+import type { Actor } from "../../lib/actor.js";
 import type { CreateLabelInput, UpdateLabelInput } from "./labels.schema.js";
-
-const loadLabel = async (
-  actorId: string,
-  labelId: string,
-  minimum: Role = Role.VIEWER,
-) => {
-  const label = await prisma.label.findUnique({ where: { id: labelId } });
-  if (!label) throw notFound("Label");
-  await requireMembership(actorId, label.workspaceId, minimum, "Label");
-  return label;
-};
-
-export const list = async (actor: Actor, workspaceId: string) => {
-  await requireMembership(actor.id, workspaceId);
+export const list = async (actor: Actor, projectId: string) => {
+  await projectScope(actor.id, projectId);
   return prisma.label.findMany({
-    where: { workspaceId },
+    where: { projectId, deletedAt: null },
     orderBy: { name: "asc" },
-    include: { _count: { select: { tasks: true } } },
   });
 };
-
 export const create = async (
   actor: Actor,
-  workspaceId: string,
+  projectId: string,
   input: CreateLabelInput,
 ) => {
-  await requireMembership(actor.id, workspaceId, Role.MEMBER);
-
-  const existing = await prisma.label.findUnique({
-    where: { workspaceId_name: { workspaceId, name: input.name } },
+  const { project } = await projectScope(actor.id, projectId, Role.MEMBER);
+  const label = await prisma.label.create({ data: { ...input, projectId } });
+  await recordActivity({
+    workspaceId: project.workspaceId,
+    projectId,
+    actorId: actor.id,
+    entityType: "label",
+    entityId: label.id,
+    action: "label.created",
+    metadata: { name: label.name },
   });
-  if (existing) throw conflict("A label with that name already exists");
-
-  return prisma.label.create({
-    data: { workspaceId, name: input.name, color: input.color },
-  });
+  return label;
 };
-
+const load = async (actor: Actor, id: string) => {
+  const l = await prisma.label.findUnique({ where: { id } });
+  if (!l || l.deletedAt) throw notFound("Label");
+  const { project } = await projectScope(actor.id, l.projectId, Role.ADMIN);
+  return { l, project };
+};
 export const update = async (
   actor: Actor,
-  labelId: string,
+  id: string,
   input: UpdateLabelInput,
 ) => {
-  await loadLabel(actor.id, labelId, Role.MEMBER);
-  return prisma.label.update({ where: { id: labelId }, data: input });
+  const { l, project } = await load(actor, id);
+  const label = await prisma.label.update({ where: { id }, data: input });
+  await recordActivity({
+    workspaceId: project.workspaceId,
+    projectId: l.projectId,
+    actorId: actor.id,
+    entityType: "label",
+    entityId: id,
+    action: "label.updated",
+    metadata: input,
+  });
+  return label;
 };
-
-export const remove = async (actor: Actor, labelId: string) => {
-  await loadLabel(actor.id, labelId, Role.ADMIN);
-  await prisma.label.delete({ where: { id: labelId } });
+export const remove = async (actor: Actor, id: string) => {
+  const { l, project } = await load(actor, id);
+  return scheduleDeletion(actor, project.workspaceId, "label", id, l.projectId);
 };

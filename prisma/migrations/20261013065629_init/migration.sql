@@ -1,11 +1,14 @@
+-- CreateSchema
+CREATE SCHEMA IF NOT EXISTS "public";
+
 -- CreateEnum
-CREATE TYPE "Role" AS ENUM ('OWNER', 'ADMIN', 'MEMBER', 'VIEWER');
+CREATE TYPE "Role" AS ENUM ('WORKSPACE_OWNER', 'ADMIN', 'MEMBER');
 
 -- CreateEnum
 CREATE TYPE "ProjectStatus" AS ENUM ('ACTIVE', 'PAUSED', 'COMPLETED');
 
 -- CreateEnum
-CREATE TYPE "TaskStatus" AS ENUM ('BACKLOG', 'TODO', 'IN_PROGRESS', 'DONE', 'CANCELLED');
+CREATE TYPE "TaskStatus" AS ENUM ('BACKLOG', 'TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE', 'CANCELLED');
 
 -- CreateEnum
 CREATE TYPE "Priority" AS ENUM ('LOW', 'MEDIUM', 'HIGH', 'URGENT');
@@ -16,6 +19,12 @@ CREATE TABLE "User" (
     "email" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "passwordHash" TEXT NOT NULL,
+    "avatar" TEXT,
+    "jobTitle" TEXT NOT NULL DEFAULT '',
+    "bio" TEXT NOT NULL DEFAULT '',
+    "timezone" TEXT NOT NULL DEFAULT 'Asia/Dhaka',
+    "theme" TEXT NOT NULL DEFAULT 'system',
+    "startPage" TEXT NOT NULL DEFAULT 'board',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -39,6 +48,7 @@ CREATE TABLE "Workspace" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "slug" TEXT NOT NULL,
+    "ownerId" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -50,7 +60,8 @@ CREATE TABLE "Membership" (
     "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
     "workspaceId" TEXT NOT NULL,
-    "role" "Role" NOT NULL DEFAULT 'MEMBER',
+    "active" BOOLEAN NOT NULL DEFAULT true,
+    "deletedAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -66,10 +77,29 @@ CREATE TABLE "Project" (
     "description" TEXT,
     "status" "ProjectStatus" NOT NULL DEFAULT 'ACTIVE',
     "archivedAt" TIMESTAMP(3),
+    "deletedAt" TIMESTAMP(3),
+    "color" TEXT NOT NULL DEFAULT '#0E7490',
+    "seats" INTEGER NOT NULL DEFAULT 10,
+    "sequence" INTEGER NOT NULL DEFAULT 0,
+    "defaultStatus" "TaskStatus" NOT NULL DEFAULT 'TODO',
+    "defaultPriority" "Priority" NOT NULL DEFAULT 'MEDIUM',
+    "showCancelled" BOOLEAN NOT NULL DEFAULT true,
+    "wipLimit" INTEGER NOT NULL DEFAULT 0,
+    "cardFields" JSONB NOT NULL DEFAULT '{"assignee":true,"due":true,"labels":true,"subtasks":true,"comments":true}',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "Project_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "ProjectMembership" (
+    "projectId" TEXT NOT NULL,
+    "membershipId" TEXT NOT NULL,
+    "role" "Role" NOT NULL DEFAULT 'MEMBER',
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "ProjectMembership_pkey" PRIMARY KEY ("projectId","membershipId")
 );
 
 -- CreateTable
@@ -86,6 +116,8 @@ CREATE TABLE "Task" (
     "dueDate" TIMESTAMP(3),
     "completedAt" TIMESTAMP(3),
     "position" INTEGER NOT NULL DEFAULT 0,
+    "number" INTEGER NOT NULL,
+    "deletedAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -95,7 +127,8 @@ CREATE TABLE "Task" (
 -- CreateTable
 CREATE TABLE "Label" (
     "id" TEXT NOT NULL,
-    "workspaceId" TEXT NOT NULL,
+    "projectId" TEXT NOT NULL,
+    "deletedAt" TIMESTAMP(3),
     "name" TEXT NOT NULL,
     "color" TEXT NOT NULL DEFAULT '#6b7280',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -130,6 +163,7 @@ CREATE TABLE "Comment" (
 CREATE TABLE "ActivityEvent" (
     "id" TEXT NOT NULL,
     "workspaceId" TEXT NOT NULL,
+    "projectId" TEXT,
     "actorId" TEXT,
     "entityType" TEXT NOT NULL,
     "entityId" TEXT NOT NULL,
@@ -138,6 +172,31 @@ CREATE TABLE "ActivityEvent" (
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "ActivityEvent_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "SavedView" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "projectId" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "filters" JSONB NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "SavedView_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Recovery" (
+    "id" TEXT NOT NULL,
+    "actorId" TEXT NOT NULL,
+    "workspaceId" TEXT NOT NULL,
+    "projectId" TEXT,
+    "entityType" TEXT NOT NULL,
+    "entityId" TEXT NOT NULL,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Recovery_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateIndex
@@ -165,6 +224,9 @@ CREATE INDEX "Project_workspaceId_status_idx" ON "Project"("workspaceId", "statu
 CREATE UNIQUE INDEX "Project_workspaceId_key_key" ON "Project"("workspaceId", "key");
 
 -- CreateIndex
+CREATE INDEX "ProjectMembership_membershipId_idx" ON "ProjectMembership"("membershipId");
+
+-- CreateIndex
 CREATE INDEX "Task_projectId_status_idx" ON "Task"("projectId", "status");
 
 -- CreateIndex
@@ -180,7 +242,10 @@ CREATE INDEX "Task_creatorId_idx" ON "Task"("creatorId");
 CREATE INDEX "Task_dueDate_idx" ON "Task"("dueDate");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Label_workspaceId_name_key" ON "Label"("workspaceId", "name");
+CREATE UNIQUE INDEX "Task_projectId_number_key" ON "Task"("projectId", "number");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Label_projectId_name_key" ON "Label"("projectId", "name");
 
 -- CreateIndex
 CREATE INDEX "TaskLabel_labelId_idx" ON "TaskLabel"("labelId");
@@ -197,8 +262,17 @@ CREATE INDEX "ActivityEvent_workspaceId_createdAt_idx" ON "ActivityEvent"("works
 -- CreateIndex
 CREATE INDEX "ActivityEvent_entityType_entityId_idx" ON "ActivityEvent"("entityType", "entityId");
 
+-- CreateIndex
+CREATE INDEX "SavedView_userId_projectId_idx" ON "SavedView"("userId", "projectId");
+
+-- CreateIndex
+CREATE INDEX "Recovery_expiresAt_idx" ON "Recovery"("expiresAt");
+
 -- AddForeignKey
 ALTER TABLE "RefreshToken" ADD CONSTRAINT "RefreshToken_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Workspace" ADD CONSTRAINT "Workspace_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Membership" ADD CONSTRAINT "Membership_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -208,6 +282,12 @@ ALTER TABLE "Membership" ADD CONSTRAINT "Membership_workspaceId_fkey" FOREIGN KE
 
 -- AddForeignKey
 ALTER TABLE "Project" ADD CONSTRAINT "Project_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "Workspace"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ProjectMembership" ADD CONSTRAINT "ProjectMembership_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ProjectMembership" ADD CONSTRAINT "ProjectMembership_membershipId_fkey" FOREIGN KEY ("membershipId") REFERENCES "Membership"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Task" ADD CONSTRAINT "Task_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -222,7 +302,7 @@ ALTER TABLE "Task" ADD CONSTRAINT "Task_assigneeId_fkey" FOREIGN KEY ("assigneeI
 ALTER TABLE "Task" ADD CONSTRAINT "Task_parentTaskId_fkey" FOREIGN KEY ("parentTaskId") REFERENCES "Task"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Label" ADD CONSTRAINT "Label_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "Workspace"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "Label" ADD CONSTRAINT "Label_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "TaskLabel" ADD CONSTRAINT "TaskLabel_taskId_fkey" FOREIGN KEY ("taskId") REFERENCES "Task"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -241,3 +321,10 @@ ALTER TABLE "ActivityEvent" ADD CONSTRAINT "ActivityEvent_workspaceId_fkey" FORE
 
 -- AddForeignKey
 ALTER TABLE "ActivityEvent" ADD CONSTRAINT "ActivityEvent_actorId_fkey" FOREIGN KEY ("actorId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "SavedView" ADD CONSTRAINT "SavedView_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "SavedView" ADD CONSTRAINT "SavedView_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+

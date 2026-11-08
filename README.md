@@ -19,13 +19,13 @@ authorization or business rules.
 
 ## Features
 
-- **Workspaces** with slug, settings, and role-based access (`OWNER` → `VIEWER`)
+- **Workspaces** with slug, settings, and workspace ownership and project roles (`WORKSPACE_OWNER`, `ADMIN`, `MEMBER`)
 - **Projects** with status, archive/unarchive, and per-project **board** and **list** views
 - **Tasks** with status, priority, assignee, due dates, subtasks, and drag-and-drop on boards
-- **Labels** at workspace scope, attachable to tasks
+- **Labels** at project scope, attachable to tasks
 - **Comments** (soft-deleted for activity continuity)
 - **Activity** feed per workspace
-- **Members** management and invitations by role
+- **Members** management with explicit project roles (no invitations)
 
 ## Running it
 
@@ -211,7 +211,7 @@ except register, login, and refresh.
 
 ### Labels, comments, activity
 
-- `GET /workspaces/:workspaceId/labels`, `POST /workspaces/:workspaceId/labels`
+- `GET /projects/:projectId/labels`, `POST /projects/:projectId/labels`
 - `PATCH /labels/:labelId`, `DELETE /labels/:labelId`
 - `GET /tasks/:taskId/comments`, `POST /tasks/:taskId/comments`
 - `PATCH /comments/:commentId`, `DELETE /comments/:commentId`
@@ -219,11 +219,33 @@ except register, login, and refresh.
 
 ### Roles
 
-`OWNER > ADMIN > MEMBER > VIEWER`. Reads need `VIEWER`, creating and editing
-content needs `MEMBER`, managing members and archiving needs `ADMIN`, and
-deleting a workspace or granting ownership needs `OWNER`. A workspace always
-keeps at least one owner. Non-members get `404` rather than `403`, so private
-workspaces are indistinguishable from ones that do not exist.
+The redesign uses `WORKSPACE_OWNER`, `ADMIN`, and `MEMBER`. Each workspace has
+exactly one owner; Admin/Member roles belong to explicit project assignments.
+Any registered user may create a workspace and become its owner. Only the
+workspace owner manages workspace people/settings, creates projects, changes
+seat limits, and archives/restores/deletes projects. Assigned project admins
+manage project settings and other project users; they cannot remove or demote
+themselves. Members can create/edit/delete tasks and their own comments.
+No actor can edit/delete another user's comments. Archived projects reject
+writes. Unassigned users receive `404` for inaccessible projects/tasks.
+
+See [the feature matrix](REDESIGN_FEATURE_MATRIX.md) for all agreed rules and
+[the implementation tracker](REDESIGN_IMPLEMENTATION_TRACKER.md) for current
+verification status. The HTML concept guides layout/workflows; the web app uses
+its existing shadcn/ui components and theme tokens.
+
+### Redesign development checks
+
+`npm run test:redesign` exercises the running API at `http://localhost:4000/api`
+(override with `TASKFLOW_TEST_API`). It creates unique test accounts/workspaces
+and cleans up only its own fixtures. It does not reset the database. Tests cover
+project isolation, role enforcement, seats, ownership transfer, comments, saved
+views, preference persistence, sessions, and the six-second Undo window.
+
+The initial migration now defines the fresh redesign schema. The existing hosted
+Prisma Postgres database was reset with user authorization during development;
+no old-data migration/backfill is included. Do not run a reset as a normal startup
+step. Future schema changes still need reviewed migrations.
 
 ### Conventions
 

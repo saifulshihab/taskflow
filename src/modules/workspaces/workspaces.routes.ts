@@ -22,3 +22,40 @@ workspacesRouter.delete(
   "/:workspaceId/members/:userId",
   workspacesController.removeMember,
 );
+
+workspacesRouter.post("/:workspaceId/transfer", workspacesController.transfer);
+
+import { route } from "../../lib/http.js";
+import { actorOf } from "../../lib/actor.js";
+import { prisma } from "../../lib/prisma.js";
+import { requireMembership, visibleProjects } from "../../lib/rbac.js";
+import { workspaceIdParams } from "./workspaces.schema.js";
+workspacesRouter.get(
+  "/:workspaceId/stats",
+  route({ params: workspaceIdParams }, async ({ req, params }) => {
+    const actor = actorOf(req);
+    await requireMembership(actor.id, params.workspaceId);
+    const scope = {
+      assigneeId: actor.id,
+      deletedAt: null,
+      project: visibleProjects(actor.id, params.workspaceId),
+    };
+    const [open, done, comments] = await Promise.all([
+      prisma.task.count({
+        where: { ...scope, status: { notIn: ["DONE", "CANCELLED"] } },
+      }),
+      prisma.task.count({ where: { ...scope, status: "DONE" } }),
+      prisma.comment.count({
+        where: {
+          authorId: actor.id,
+          deletedAt: null,
+          task: {
+            deletedAt: null,
+            project: visibleProjects(actor.id, params.workspaceId),
+          },
+        },
+      }),
+    ]);
+    return { open, done, comments };
+  }),
+);

@@ -71,7 +71,10 @@ export const tasksController = {
     taskService.detachLabel(actorOf(req), params.taskId, params.labelId),
   ),
 
+  duplicate: route({ params: taskIdParams }, ({ params, req }) =>
+    taskService.duplicate(actorOf(req), params.taskId),
+  ),
   remove: route({ params: taskIdParams }, async ({ params, req }) => {
-    await taskService.remove(actorOf(req), params.taskId);
+    return taskService.remove(actorOf(req), params.taskId);
   }),
 };
